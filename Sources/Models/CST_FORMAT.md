@@ -1,0 +1,215 @@
+# Logic Pro `.cst` (Channel Strip) File Format
+
+## Overview
+
+Channel Strip (.cst) files store complete channel strip configurations in Logic Pro. They contain an **ordered collection** of plugin settings—one for each instrument or effect in the channel strip.
+
+A CST file represents all the front-panel settings from all plugins in a channel strip (both instruments and effects), but does NOT include mix controls like pan, fader, or sends (those are in Patch files).
+
+## Structure
+
+A CST file can contain:
+- **Zero or one** instrument plugin — both Instrument and Track channel strips contain an instrument slot. On an Instrument channel strip, this holds the selected instrument (or is empty if none is selected). On a Track channel strip (audio track), the slot is always empty.
+- **Zero or more** MIDI plugins (if on an instrument track)
+- **Zero or more** audio FX plugins
+- **Ordered**: The sequence matters, as it represents signal flow
+
+### Example
+
+```
+Channel Strip A (Instrument channel strip — MIDI track):
+  1. Retro Synth instrument (PST file)
+  2. Arpeggiator MIDI effect (MIDI plugin)
+  3. EQ effect (AU Preset)
+  4. Reverb effect (PST file)
+  5. Compressor effect (AU Preset)
+
+Channel Strip B (Track channel strip — audio track):
+  1. Pst instrument slot (empty — no instrument selected)
+  2. EQ effect (AU Preset)
+  3. Reverb effect (PST file)
+```
+
+The examples above represent what is _seen_ on the channel strip in Logic Pro. However, there are 
+additional plugins, not seen on the channel strip, which are used to represent e.g. Smart Controls
+and keyboard zone and MIDI routing settings (note range, velocity range, transpose, key scaling/velocity curves), which do appear in the `.cst` file.
+
+## Container Format
+
+CST files are stored in a Logic Pro-specific container format (OCuA header). This container format:
+- Starts with "OCuA" magic bytes (Logic Pro binary format identifier)
+- Contains metadata and structural information
+- Embeds individual plugin setting files (PST/AU Preset) with their boundaries
+
+### File Layout
+
+```
+Offset    Content
+------    -------
+0x00      OCuA header and metadata (variable size)
+...       Embedded PST and AU Preset files (precise layout TBD)
+EOF       End of file
+```
+
+## Plugin Settings Types
+
+### Instrument Plugin
+- Maximum of one per `cst` file
+- Typically a `pst` file (Logic Pro native instrument) or an `aupreset` file (third-party instrument)
+- Represents the main sound source (e.g., Retro Synth, Sculpture)
+
+### MIDI Effects
+- Zero or more per `cst` file
+- Only present in Instrument tracks (not Audio tracks)
+- Can be present even when there is no instrument plugin selected
+- Applied to MIDI data before reaching the instrument
+- Examples: Arpeggiator, Chord Trigger
+
+### Audio FX Plugins
+- Zero or more per CST file
+- Present in both audio and instrument channel strips
+- Applied to audio signal in series
+- Can be PST (Logic native) or AU Preset (Audio Unit) files
+
+### System / Metadata Blocks
+- Not user-visible on the channel strip UI
+- Appear in high-numbered slots (9–11, and ≥ 12) beyond the user-facing audio FX range
+- Format: **NSKeyedArchiver binary plist** (`bplist00` header, `$archiver` key present)
+- Contain Logic-internal Objective-C objects (MA\* classes); known classes include:
+  - `MAKeyboardLayer` — keyboard zone and MIDI routing settings (note range, velocity range, transpose, key scaling and velocity response curves)
+  - Other MA\* classes are decoded to plain `[String: Any]` with a `__class__` key
+- Raw bytes are preserved verbatim for round-trip fidelity; the UID reference graph is resolved lazily via `KeyedArchive.decoded`
+- The parser exposes keyboard layer settings via `KeyedArchive.environmentLayer: MAKeyboardLayer?`
+
+### `pst` (Plug-In Settings)
+- Binary format with GAMETSPP magic-string header
+- Used for Logic Pro's native instruments and effects
+- Contains binary parameter data
+- Starts with structured header: fileSize (4B) + formatVersion (4B) + dataSize (4B) + magic (8B) + flags (4B)
+
+### `aupreset`
+- XML or binary plist format
+- Used for Audio Unit plugins (both Logic-native and third-party)
+- Contains structured property list data
+- Typically includes `data` key with embedded binary payload
+
+Not all embedded files have associated filenames; some are raw data
+
+## Current Implementation
+
+The `Cst` struct provides:
+- `instrument: PluginSetting?` — Optional instrument plugin
+- `midiPlugins: [PluginSetting]` — MIDI plugins
+- `audioFxPlugins: [PluginSetting]` — Audio FX plugins
+
+`PluginSetting` cases:
+- `.pst(Pst)` — Logic-native binary preset (GAMETSPP header)
+- `.aupreset(Aupreset)` — Audio Unit plist preset (XML or binary plist)
+- `.keyedArchive(KeyedArchive)` — NSKeyedArchiver binary plist; system/metadata block (`isSystemBlock == true`); UID graph resolved via `decoded`; Environment Layer settings accessible via `environmentLayer`
+- `.unknown(Data)` — Raw bytes for formats not yet modelled; also `isSystemBlock == true`
+
+System blocks (`.keyedArchive` and `.unknown`) are excluded from the user-visible plugin lists.
+
+### Plugin Role Classification
+
+Each UCuA block carries a role byte at offset 187 of the block prefix. Use bit tests, not equality:
+
+| Bit | Meaning |
+|-----|---------|
+| `0x08` | Instrument (may combine with other bits, e.g. `0x18` on RS Antimatter) |
+| `0x02` | MIDI FX (never combined with `0x08` in observed files) |
+| neither | Audio FX (`0x00` on Instrument channel strips, `0x10` on Track channel strips) |
+
+Classification rules:
+- instrument: `role & 0x08 != 0`
+- MIDI FX: `role & 0x02 != 0 && role & 0x08 == 0`
+- audio FX: `role & 0x08 == 0 && role & 0x02 == 0`
+
+For from-scratch CSTs where the prefix is shorter than 188 bytes, the parser falls back to treating the first PST as the instrument and the rest as audio FX (MIDI FX cannot be distinguished in that case).
+
+### Slot Numbering
+
+- Slot 2: instrument
+- Slots 3–6: audio FX in signal-flow order
+- Slots 7–10: MIDI FX in signal-flow order
+- Slots 9–11: may also hold NSKeyedArchiver system blocks
+- Slot 12+: opaque/system blocks (`.opaque` or `.keyedArchive` in parser)
+
+## Future Work
+
+- [ ] Expand NSKeyedArchiver typed coverage: add fixture CSTs for all MIDI FX plugin types (Note Repeater, Velocity Processor, Scripter, etc.) to discover any additional MA\* class names beyond the currently observed set
+
+## Technical Notes
+
+### OCuA Container Structure
+
+- **Header size**: `237 + (byte_62 * 4)` bytes. Byte 62 = slot capacity.
+- **Header byte 40**: Channel strip type — `0x40`=Track, `0x42`=Bus, `0x43`=Instrument.
+- **Footer**: Constant 50 bytes, identical across all files.
+- Each embedded plugin lives in a UCuA sub-container block (36-byte header + prefix + payload).
+- UCuA block size field at offset 28 (LE uint32) = total block size − 36; updated on serialization.
+
+### Audio Track Environment Properties (OCuA header, exploratory)
+
+Audio track CSTs store Environment Instrument properties (Flex Mode, Show Sends, etc.) inline
+in the OCuA header — not as NSKeyedArchiver blocks. These offsets were identified by comparing
+an unmodified audio track CST (`Audio track minimal.cst`) against one with Flex Mode set to
+Monophonic and Show Sends turned off (`Audio track layer edited.cst`):
+
+| Offset | Known values | Candidate meaning |
+|--------|-------------|-------------------|
+| `0x78` (120) | `0x00` = Off, `0x04` = Monophonic | Flex Mode |
+| `0x82–0x83` (130–131) | `0x00 0x00` = on, `0xff 0xff` = off | Show Sends (inverted: `0x0000` = default/on) |
+
+Other bytes that changed between the two files (`0x3E`, `0x42`, `0x44`, `0x4E`) also shifted
+but their semantics are not yet understood. MIDI/Instrument track CSTs do not appear to use
+these offsets for the same purpose — their Environment Layer settings are in an `MAKeyboardLayer`
+NSKeyedArchiver block instead.
+
+## Related Formats
+
+- **PST files**: Individual plugin settings (can also be saved as `.pst` files)
+- **AU Preset files**: Individual au preset settings (can also be saved as `.aupreset` files)
+- **Patch files** (`.patch`): Like CST but includes mix controls; can contain Track Stacks
+- **Instrument files** (`.exs`): Sampler instrument settings (separate format)
+
+## File Structure Examples
+
+### PST-based Channel Strip
+```
+File: Channel Strip.cst
+Format: PST (magic-string)
+Size: Variable
+Contents: Binary PST data with instrument/effect parameters
+```
+
+### AU Preset-based Channel Strip
+```
+File: AU Channel Strip.cst
+Format: AU Preset (plist)
+Size: Variable
+Contents: XML/binary plist with AU plugin data
+```
+
+## Common Use Cases
+
+- **Instrument Tracks**: Retro Synth, Sculpture presets
+- **Audio Effects**: Channel Strip effects, EQ, dynamics
+- **MIDI Effects**: Arpeggiator, chord trigger settings
+- **Third-party AU**: External plugin configurations
+
+## Relationship to Other Formats
+
+- **Contains PST/AU**: Channel strips embed preset data
+- **Referenced by Patches**: Patch bundles contain channel strip files
+- **Project Integration**: Used throughout Logic Pro projects
+
+## File Locations
+
+- **User Presets**: `~/Music/Audio\ Music\ Apps/Channel\ Strip\ Settings/`
+- **Project Specific**: Within `.logicx` project bundles
+- **Patch Bundles**: Inside `.patch` directory bundles
+
+## Implementation
+
+See [Cst.swift](Cst.swift) for the Swift implementation that parses and serializes CST files, and [KeyedArchive.swift](KeyedArchive.swift) for the NSKeyedArchiver decoder and `MAKeyboardLayer` model.
