@@ -6,9 +6,10 @@ let package = Package(
     platforms: [.macOS(.v13), .iOS(.v16)],
     products: [
         .library(name: "LogicFiles", targets: ["LogicFiles"]),
+        .executable(name: "logicfiles", targets: ["LogicFilesTool"]),
     ],
     dependencies: [
-        // Used as a command plugin: `swift package plugin "Lint Source Code"`
+        // Used as a command plugin: `swift package plugin lint-source-code`
         .package(url: "https://github.com/swiftlang/swift-format.git", from: "602.0.0"),
     ],
     targets: [

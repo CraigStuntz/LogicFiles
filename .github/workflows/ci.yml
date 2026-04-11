@@ -23,4 +23,4 @@ jobs:
         run: swift test
 
       - name: Lint
-        run: swift package plugin "Lint Source Code"
+        run: swift package plugin lint-source-code
