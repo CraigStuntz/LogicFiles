@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+* `AudioInput` — new struct representing a selected hardware audio input (mono or stereo), with `inputIndex` and `isStereo` properties.
+* `Cst.audioInput: AudioInput?` — reads the audio input selector byte from the OCuA header marker `00 80 00 80`; returns `nil` for instrument/bus strips and all standalone `.cst` files examined.
+* `PatchChannelSettings.inputIsStereo: Bool?` — decodes the `Channel_inputIsStereo` key from the patch `data.plist`; `nil` for non-audio channel strips.
+* `PatchChannelSettings.audioInput: AudioInput?` — synthesizes an `AudioInput` from `inputIndex` and `inputIsStereo`; returns `nil` for bus inputs and instrument/MIDI channel strips.
+
 ## [0.1.0] - 2026-04-11
 
 ### Added

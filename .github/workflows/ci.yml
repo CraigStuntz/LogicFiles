@@ -22,11 +22,11 @@ jobs:
           key: ${{ runner.os }}-spm-${{ hashFiles('Package.resolved') }}
           restore-keys: ${{ runner.os }}-spm-
 
+      - name: Lint
+        run: swift package plugin lint-source-code
+
       - name: Build
         run: swift build
 
       - name: Test
         run: swift test
-
-      - name: Lint
-        run: swift package plugin lint-source-code
