@@ -9,9 +9,11 @@ A CST file represents all the front-panel settings from all plugins in a channel
 ## Structure
 
 A CST file can contain:
-- **Zero or one** instrument plugin — both Instrument and Track channel strips contain an instrument slot. On an Instrument channel strip, this holds the selected instrument (or is empty if none is selected). On a Track channel strip (audio track), the slot is always empty.
+- **Zero or one** instrument plugin — Instrument channel strips have an instrument slot (slot 2) that holds the selected instrument, or is empty if none is selected. Track channel strips (audio tracks) never have an instrument plugin; the instrument slot is always absent.
+
+> **Audio input and the CST file.** The OCuA header contains an audio input selector byte (see "Audio Input Encoding" below). However, in all standalone `.cst` files examined, this byte holds the default/unset value regardless of what input was selected when the file was saved. Non-default values have only been observed in CST files embedded inside a `.patch` bundle. The authoritative source for input selection is the patch bundle's `data.plist` (`Channel_inputIndex_1`, `Channel_inputIsBus`, `Channel_inputIsStereo`). Logic Pro does not restore the audio input when loading a standalone CST or even a full `.patch` bundle — this may be a Logic Pro bug. See `PatchChannelSettings.inputIndex`, `.inputIsBus`, `.inputIsStereo`, and `Cst.audioInput`.
 - **Zero or more** MIDI plugins (if on an instrument track)
-- **Zero or more** audio FX plugins
+- **Zero or more** audio FX plugins — on Track channel strips, audio FX occupy slots starting at slot 2 (not slot 3 as on Instrument channel strips); role byte `0x10` indicates audio FX on a Track channel strip
 - **Ordered**: The sequence matters, as it represents signal flow
 
 ### Example
@@ -19,14 +21,14 @@ A CST file can contain:
 ```
 Channel Strip A (Instrument channel strip — MIDI track):
   1. Retro Synth instrument (PST file)
-  2. Arpeggiator MIDI effect (MIDI plugin)
-  3. EQ effect (AU Preset)
+  2. Arpeggiator MIDI effect (PST file)
+  3. Channel EQ effect (PST file)
   4. Reverb effect (PST file)
-  5. Compressor effect (AU Preset)
+  5. Third-party AU effect (AU Preset)
 
 Channel Strip B (Track channel strip — audio track):
-  1. Pst instrument slot (empty — no instrument selected)
-  2. EQ effect (AU Preset)
+  1. Instrument slot (empty — no instrument selected)
+  2. Channel EQ effect (PST file)
   3. Reverb effect (PST file)
 ```
 
@@ -55,7 +57,7 @@ EOF       End of file
 
 ### Instrument Plugin
 - Maximum of one per `cst` file
-- Typically a `pst` file (Logic Pro native instrument) or an `aupreset` file (third-party instrument)
+- Logic-native instruments use `pst` format; third-party AU instruments use `aupreset` format
 - Represents the main sound source (e.g., Retro Synth, Sculpture)
 
 ### MIDI Effects
@@ -69,7 +71,7 @@ EOF       End of file
 - Zero or more per CST file
 - Present in both audio and instrument channel strips
 - Applied to audio signal in series
-- Can be PST (Logic native) or AU Preset (Audio Unit) files
+- Logic-native effects use PST format; third-party AU effects use AU Preset format
 
 ### System / Metadata Blocks
 - Not user-visible on the channel strip UI
@@ -89,7 +91,7 @@ EOF       End of file
 
 ### `aupreset`
 - XML or binary plist format
-- Used for Audio Unit plugins (both Logic-native and third-party)
+- Used for third-party Audio Unit plugins; Logic-native plugins use `.pst` 
 - Contains structured property list data
 - Typically includes `data` key with embedded binary payload
 
@@ -101,6 +103,7 @@ The `Cst` struct provides:
 - `instrument: PluginSetting?` — Optional instrument plugin
 - `midiPlugins: [PluginSetting]` — MIDI plugins
 - `audioFxPlugins: [PluginSetting]` — Audio FX plugins
+- `audioInput: AudioInput?` — Selected hardware audio input; `nil` for instrument/bus strips and standalone CSTs (see "Audio Input Encoding" above)
 
 `PluginSetting` cases:
 - `.pst(Pst)` — Logic-native binary preset (GAMETSPP header)
@@ -129,8 +132,8 @@ For from-scratch CSTs where the prefix is shorter than 188 bytes, the parser fal
 
 ### Slot Numbering
 
-- Slot 2: instrument
-- Slots 3–6: audio FX in signal-flow order
+- Slot 2: instrument (Instrument channel strips); first audio FX (Track channel strips)
+- Slots 3–6: audio FX in signal-flow order (Instrument channel strips only; Track uses 2–5)
 - Slots 7–10: MIDI FX in signal-flow order
 - Slots 9–11: may also hold NSKeyedArchiver system blocks
 - Slot 12+: opaque/system blocks (`.opaque` or `.keyedArchive` in parser)
@@ -148,6 +151,30 @@ For from-scratch CSTs where the prefix is shorter than 188 bytes, the parser fal
 - **Footer**: Constant 50 bytes, identical across all files.
 - Each embedded plugin lives in a UCuA sub-container block (36-byte header + prefix + payload).
 - UCuA block size field at offset 28 (LE uint32) = total block size − 36; updated on serialization.
+
+### Audio Input Encoding (OCuA header)
+
+Within the OCuA header's slot array region (bytes 237+), the 4-byte marker `00 80 00 80`
+is followed by a 1-byte audio input selector:
+
+| Value | Meaning |
+|-------|---------|
+| `0x00` | Default / no input |
+| `0x0c` | Default / no input (present on instrument, bus/aux, and audio tracks with no input selected) |
+| `0x01` | Mono Input 1 *(confirmed)* |
+| `0x09` | Stereo In 1-2 *(confirmed)* |
+| `1..8` | Mono inputs *(inferred)*: `inputIndex = value − 1` (0-indexed) |
+| `9+`   | Stereo pairs *(inferred)*: `inputIndex = value − 9` (0-indexed) |
+
+The marker position is not at a fixed absolute offset — it varies by channel type and slot
+capacity. Search for `[0x00, 0x80, 0x00, 0x80]` within the header and read the following byte.
+
+Only two non-default values (`0x01`, `0x09`) have been confirmed from real files. The conversion
+formula for other values is inferred and may be incomplete. Non-default values have only been
+observed in CST files embedded inside a `.patch` bundle; standalone CSTs always show `0x0c`.
+
+Bus/Aux channel strips (`0x42`) always produce `0x0c` — bus routing is not encoded in the
+CST binary. Exposed as `Cst.audioInput: AudioInput?` (nil for `0x00`/`0x0c`).
 
 ### Audio Track Environment Properties (OCuA header, exploratory)
 

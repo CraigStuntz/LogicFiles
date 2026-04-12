@@ -88,6 +88,8 @@ public struct PatchChannelSettings: Codable, Sendable {
   public let inputIndex: Int
   /// Whether the input is a bus rather than a physical input.
   public let inputIsBus: Bool
+  /// Whether the audio input is stereo. `nil` when absent (e.g. MIDI/instrument channel strips).
+  public let inputIsStereo: Bool?
   /// Index of the channel strip's audio output.
   public let outputIndex: Int
   /// Whether the output is a bus rather than a physical output.
@@ -108,6 +110,16 @@ public struct PatchChannelSettings: Codable, Sendable {
   /// examples contain empty send slots.
   public let sends: [PatchSend]
 
+  /// The selected hardware audio input, if any.
+  ///
+  /// Returns `nil` when `inputIsBus` is `true` (the input is a bus, not a physical
+  /// hardware input) or when `inputIsStereo` is `nil` (non-audio channel strips such
+  /// as instruments).
+  public var audioInput: AudioInput? {
+    guard !inputIsBus, let isStereo = inputIsStereo else { return nil }
+    return AudioInput(inputIndex: inputIndex, isStereo: isStereo)
+  }
+
   enum CodingKeys: String, CodingKey {
     case filename = "Filename"
     case uuid = "UUID"
@@ -118,6 +130,7 @@ public struct PatchChannelSettings: Codable, Sendable {
     case instrID = "Channel_instID"
     case inputIndex = "Channel_inputIndex_1"
     case inputIsBus = "Channel_inputIsBus"
+    case inputIsStereo = "Channel_inputIsStereo"
     case outputIndex = "Channel_outputIndex"
     case outputIsBus = "Channel_outputIsBus"
     case outputIsStereo = "Channel_outputIsStereo"
@@ -146,6 +159,7 @@ public struct PatchChannelSettings: Codable, Sendable {
     instrID = try c.decode(Int.self, forKey: .instrID)
     inputIndex = try c.decode(Int.self, forKey: .inputIndex)
     inputIsBus = try c.decode(Bool.self, forKey: .inputIsBus)
+    inputIsStereo = try c.decodeIfPresent(Bool.self, forKey: .inputIsStereo)
     outputIndex = try c.decode(Int.self, forKey: .outputIndex)
     outputIsBus = try c.decode(Bool.self, forKey: .outputIsBus)
     outputIsStereo = try c.decodeIfPresent(Bool.self, forKey: .outputIsStereo)

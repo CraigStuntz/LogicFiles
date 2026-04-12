@@ -112,6 +112,39 @@ private func resolvePatchURL(_ name: String, in folder: String) -> URL {
   #expect(!root.name.isEmpty)
 }
 
+@Test func testStereoAudioPatchData() throws {
+  let patchURL = resolvePatchURL("Stereo audio patch", in: "Stereo audio patch")
+  let patch = try Patch(contentsOf: patchURL)
+
+  let pd = patch.patchData
+  #expect(pd.channels.count == 1)
+
+  let root = pd.channels[0]
+  #expect(root.isRoot)
+  #expect(root.inputIsStereo == true)
+}
+
+@Test func testPatchChannelAudioInput() throws {
+  let patchURL = resolvePatchURL(
+    "Summing stack with in 1-2 and input 1",
+    in: "Summing stack with different audio inputs")
+  let patch = try Patch(contentsOf: patchURL)
+  let channels = patch.patchData.channels
+
+  let stereo = try #require(channels.first { $0.filename == "Stereoaudiopatch.cst" })
+  let stereoInput = try #require(stereo.audioInput)
+  #expect(stereoInput.isStereo)
+  #expect(stereoInput.inputIndex == 0)
+
+  let mono = try #require(channels.first { $0.filename == "Audio2.cst" })
+  let monoInput = try #require(mono.audioInput)
+  #expect(!monoInput.isStereo)
+  #expect(monoInput.inputIndex == 0)
+
+  let root = try #require(channels.first { $0.isRoot })
+  #expect(root.audioInput == nil, "Root (bus input) should have nil audioInput")
+}
+
 @Test func testSummingStackPatchData() throws {
   let patchURL = resolvePatchURL("Summing Stack", in: "Summing Stack Patch")
   let patch = try Patch(contentsOf: patchURL)

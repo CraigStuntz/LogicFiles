@@ -9,6 +9,9 @@ swift build                        # Build the library
 swift test                         # Run all tests
 ```
 
+## Logic Pro File Types
+These are documented in the `*.md` files in @Sources/Models. We should attempt to keep our knowledge of the Logic Pro file formats (from the actual examples in @Tests/Resources/examples) up to date in these `.md` files and we should base code decsions on the contents of these files. If we find a case where, for example, a test does not pass because we have added a new example, we should first update the appropriate `.md` file with the new information from the new example, and then fix the code and docstrings within the code. 
+
 ## Architecture
 
 Swift SPM library (`Sources/`) targeting macOS 13+ and iOS 16+, using Swift 6 language mode. All source types are value-type `struct`s.

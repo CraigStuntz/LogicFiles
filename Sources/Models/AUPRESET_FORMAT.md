@@ -2,7 +2,7 @@
 
 ## Overview
 
-AU Preset (.aupreset) files are Apple's standard format for storing Audio Unit 
+AU Preset (`.aupreset`) files are Apple's standard format for storing Audio Unit 
 preset data in Logic Pro. They use Apple's Property List (plist) format to store 
 preset metadata and binary parameter data.
 
@@ -87,7 +87,7 @@ The `data` field contains base64-encoded binary data that may include:
 
 ## Relationship to Other Formats
 - **Channel Strip**: CST files may reference AU presets
-- **Patch Bundles**: Patches can contain AU preset files
+- **Patch Bundles**: Patches contain `.cst` files, which in turn may reference AU presets — a `.patch` never contains an `.aupreset` directly
 
 ## Implementation
 

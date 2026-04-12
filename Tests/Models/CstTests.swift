@@ -289,6 +289,57 @@ import Testing
   #expect(decodedCst.audioFxPlugins.count == originalCst.audioFxPlugins.count)
 }
 
+@Test func testAudioInputMonoInput1() throws {
+  let resourceURL = requireTestResourceURL(
+    "Audio2", extension: Cst.pathExtension,
+    subdirectory:
+      "Summing stack with different audio inputs/Summing stack with in 1-2 and input 1.patch")
+  let cst = try Cst(data: Data(contentsOf: resourceURL))
+  let input = try #require(cst.audioInput)
+  #expect(!input.isStereo)
+  #expect(input.inputIndex == 0)
+}
+
+@Test func testAudioInputStereoIn12() throws {
+  let resourceURL = requireTestResourceURL(
+    "Stereoaudiopatch", extension: Cst.pathExtension,
+    subdirectory:
+      "Summing stack with different audio inputs/Summing stack with in 1-2 and input 1.patch")
+  let cst = try Cst(data: Data(contentsOf: resourceURL))
+  let input = try #require(cst.audioInput)
+  #expect(input.isStereo)
+  #expect(input.inputIndex == 0)
+}
+
+@Test func testAudioInputNilForInstrumentCst() throws {
+  let resourceURL = requireTestResourceURL(
+    "Channel Strip", extension: Cst.pathExtension, subdirectory: "Retro Synth Defaults")
+  let cst = try Cst(data: Data(contentsOf: resourceURL))
+  #expect(cst.audioInput == nil)
+}
+
+@Test func testAudioInputNilForAudioTrackNoInput() throws {
+  let resourceURL = requireTestResourceURL(
+    "Audio track no input", extension: Cst.pathExtension, subdirectory: "Audio track no input")
+  let cst = try Cst(data: Data(contentsOf: resourceURL))
+  #expect(cst.audioInput == nil)
+}
+
+@Test func testAudioInputNilForStereoAux() throws {
+  let resourceURL = requireTestResourceURL(
+    "Stereo Aux", extension: Cst.pathExtension, subdirectory: "Stereo Aux")
+  let cst = try Cst(data: Data(contentsOf: resourceURL))
+  #expect(cst.audioInput == nil, "Aux channel strips do not encode bus routing in the OCuA binary")
+}
+
+@Test func testStereoAuxRoundTrip() throws {
+  let resourceURL = requireTestResourceURL(
+    "Stereo Aux", extension: Cst.pathExtension, subdirectory: "Stereo Aux")
+  let data = try Data(contentsOf: resourceURL)
+  let cst = try Cst(data: data)
+  #expect(try cst.data() == data)
+}
+
 @Test func testKeyedArchiveEnvironmentLayer() throws {
   let url = requireTestResourceURL(
     "Channel Strip", extension: Cst.pathExtension, subdirectory: "Retro Synth Defaults")

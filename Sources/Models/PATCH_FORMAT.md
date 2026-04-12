@@ -7,6 +7,8 @@ Patch (.patch) files are directory bundles that contain complete Logic Pro chann
 > Patches include everything Channel Strip Settings do—all front-panel settings for all the individual plug-ins in the strip—but they also include the values of the other channel strip controls that are not part of a Channel Strip Setting—Send settings, and Pan and Channel Fader values. Patches can even include multiple channel strips, if they’re part of a Track Stack, including destination Aux channels within the Stack. 
 (From "[Demystifying Logic Pro's Plug-In Settings, Channel Strip Settings & Patches](https://www.macprovideo.com/article/logic-pro/demystifying-logic-pro-x-s-plug-in-settings-channel-strip-settings-patches)")
 
+Additionally, a `.patch` contains the selected audio input of an audio track. 
+
 ## Directory Structure
 
 Patch files are actually [bundles](https://en.wikipedia.org/wiki/Bundle_(macOS)) with a `.patch` extension containing:

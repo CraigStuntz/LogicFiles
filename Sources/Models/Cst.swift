@@ -207,6 +207,26 @@ public struct Cst: Codable, Sendable, LogicFileData {
     return nil
   }
 
+  /// The selected hardware audio input, if any.
+  ///
+  /// Returns `nil` for channel strips where no input is configured — instrument
+  /// channel strips, bus/aux strips, and audio tracks with no input selected.
+  ///
+  /// The value is read from a marker in the OCuA header (`0x00 0x80 0x00 0x80`)
+  /// followed by a single byte encoding the input selection. The encoding is only
+  /// partially confirmed; see ``AudioInput`` for details.
+  ///
+  /// - Note: Non-nil values have only been observed in CST files embedded inside a
+  ///   `.patch` bundle. Standalone `.cst` files always return `nil` in all examined
+  ///   examples.
+  public var audioInput: AudioInput? {
+    let marker = Data([0x00, 0x80, 0x00, 0x80])
+    guard let markerRange = ocuaHeader.range(of: marker) else { return nil }
+    let valueIndex = markerRange.upperBound
+    guard valueIndex < ocuaHeader.endIndex else { return nil }
+    return AudioInput(rawValue: ocuaHeader[valueIndex])
+  }
+
   // MARK: - Mutation
 
   /// The number of user-visible plugin slots in this channel strip.
