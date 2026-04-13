@@ -46,7 +46,9 @@ Cst.matches(pathExtension: "CST")  // true (case-insensitive)
 
 Flat file types (`Pst`, `Aupreset`, `Cst`) also conform to `LogicFileData`, which adds
 `init(data:) throws` for parsing and `func data() throws -> Data` for serialization.
-`Patch` is a directory bundle and uses `init(contentsOf:)` / `write(to:)` instead.
+
+Bundle types (`Patch`) conform to `LogicFileBundle`, which adds
+`init(contentsOf:) throws` for loading and `func write(to:) throws` for saving.
 
 ### Reading a file
 

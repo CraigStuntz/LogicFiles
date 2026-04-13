@@ -30,3 +30,17 @@ public protocol LogicFileData: LogicFile {
   /// Serialize back to raw file bytes.
   func data() throws -> Data
 }
+
+/// A Logic Pro file type whose content is stored as a directory bundle on disk.
+///
+/// Conforming types support round-trip fidelity: `init(contentsOf:)` followed by `write(to:)`
+/// must produce byte-for-byte identical output.
+///
+/// - Note: Use `LogicFileData` for flat-file types. Bundle types (`.patch`, `.logicx`) conform here.
+public protocol LogicFileBundle: LogicFile {
+  /// Load the bundle from a directory URL on disk.
+  init(contentsOf url: URL) throws
+
+  /// Write the bundle to a directory URL on disk.
+  func write(to url: URL) throws
+}

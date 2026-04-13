@@ -7,8 +7,10 @@ import Foundation
 /// - Zero or more additional `.cst` files — for summing stacks
 /// - `data.plist` — channel strip surface settings (Pan, Fader, Sends, etc.)
 ///
+/// Conforms to `LogicFileBundle`; use `init(contentsOf:)` to load and `write(to:)` to save.
+///
 /// See also: [PATCH_FORMAT.md](PATCH_FORMAT.md) for detailed format specification.
-public struct Patch: Codable, Sendable, LogicFile {
+public struct Patch: Codable, Sendable, LogicFileBundle {
   /// The canonical lowercase URL path extension for patch bundles.
   public static let pathExtension = "patch"
 

@@ -20,6 +20,7 @@ let package = Package(
             exclude: [
                 "Models/AUPRESET_FORMAT.md",
                 "Models/CST_FORMAT.md",
+                "Models/LOGICX_FORMAT.md",
                 "Models/PATCH_FORMAT.md",
                 "Models/PST_FORMAT.md"
             ],

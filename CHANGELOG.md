@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+* `LogicFileBundle` — new protocol for Logic Pro file types stored as directory bundles on disk; mirrors `LogicFileData` but uses `init(contentsOf:) throws` / `write(to:) throws` instead of `Data`-based init/serialization. `Patch` now conforms.
 * `AudioInput` — new struct representing a selected hardware audio input (mono or stereo), with `inputIndex` and `isStereo` properties.
 * `Cst.audioInput: AudioInput?` — reads the audio input selector byte from the OCuA header marker `00 80 00 80`; returns `nil` for instrument/bus strips and all standalone `.cst` files examined.
 * `PatchChannelSettings.inputIsStereo: Bool?` — decodes the `Channel_inputIsStereo` key from the patch `data.plist`; `nil` for non-audio channel strips.
