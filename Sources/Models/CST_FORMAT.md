@@ -148,9 +148,31 @@ For from-scratch CSTs where the prefix is shorter than 188 bytes, the parser fal
 
 - **Header size**: `237 + (byte_62 * 4)` bytes. Byte 62 = slot capacity.
 - **Header byte 40**: Channel strip type — `0x40`=Track, `0x42`=Bus, `0x43`=Instrument.
+- **Header bytes 97–103**: Channel name string (null-terminated, e.g. `" Inst 1"`).
+- **Header bytes 224+**: UUID-like field, unique per file.
+- **Header bytes 237+**: Variable-length slot array, 4 bytes per slot.
 - **Footer**: Constant 50 bytes, identical across all files.
 - Each embedded plugin lives in a UCuA sub-container block (36-byte header + prefix + payload).
 - UCuA block size field at offset 28 (LE uint32) = total block size − 36; updated on serialization.
+- UCuA slot number at offset 18 (LE uint16).
+- UCuA sub-header size at offset 36: `424` for named plugins (PST/XML-AU), `64` for direct BIN-AU, `196` for opaque.
+
+### UCuA Block Prefix Sizes
+
+| Type | Prefix size | Key fields |
+|------|-------------|------------|
+| PST (named) | 220 bytes | Filename at +50; plugin display name at +156; `"GAME"` at +168; manufacturer codes at +176 |
+| XML AU (named) | 208 bytes | Filename at +50; AU component codes at +168 (manufacturer, type, subtype) |
+| Binary AU (direct) | 56 bytes | Data length at +52; bplist starts at +56 |
+| Opaque (patch ref) | 228 bytes | Patch filename; no parseable plugin |
+
+### What Logic Reads From Where
+
+- **Plugin type to instantiate**: UCuA block prefix offsets 156–175 (plugin name + component codes)
+- **Preset name displayed in UI**: UCuA block prefix offset 50 (filename string)
+- **Actual parameter values**: PST/AU payload data — independent of the prefix
+- Logic does **not** cross-check prefix metadata against payload data
+- Logic silently ignores blocks with unrecognized or missing prefix metadata (shows "No Plug-in")
 
 ### Audio Input Encoding (OCuA header)
 
@@ -233,9 +255,11 @@ Contents: XML/binary plist with AU plugin data
 
 ## File Locations
 
-- **User Presets**: `~/Music/Audio\ Music\ Apps/Channel\ Strip\ Settings/`
+- **User Presets**: `~/Music/Audio Music Apps/Channel Strip Settings/` — subfolders: `Instrument/`, `Track/`, `Bus/`, `Output/`
 - **Project Specific**: Within `.logicx` project bundles
 - **Patch Bundles**: Inside `.patch` directory bundles
+
+> **Note:** Logic Pro does **not** read channel strips from `~/Library/Application Support/Logic/Channel Strip Settings/` — that path is ineffective.
 
 ## Implementation
 
