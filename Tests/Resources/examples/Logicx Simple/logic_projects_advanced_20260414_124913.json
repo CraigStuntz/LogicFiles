@@ -1,0 +1,118 @@
+{
+  "metadata": {
+    "generated": "2026-04-14T12:49:13.837559",
+    "location": "/Users/craig/Documents/CraigStuntz/LogicFiles/Tests/Resources/examples/Logicx Simple",
+    "analyzer_version": "2.0",
+    "total_projects": 1
+  },
+  "summary_statistics": {
+    "total_projects": 1,
+    "total_tracks": 1,
+    "total_track_names_found": 3,
+    "total_regions_found": 0,
+    "total_plugins_found": 2,
+    "total_presets_found": 0,
+    "avg_tracks": 1,
+    "avg_bpm": 120.0,
+    "bpm_range": [
+      120.0,
+      120.0
+    ],
+    "key_distribution": {
+      "C major": 1
+    },
+    "mode_distribution": {
+      "major": 1
+    },
+    "time_signatures": {
+      "4/4": 1
+    },
+    "sample_rates": {
+      "48000": 1
+    },
+    "plugin_usage": {
+      "Retro Synth": 1,
+      "$Automatic-Vintage Synth 8 Single Row": 1
+    },
+    "preset_usage": {}
+  },
+  "projects": [
+    {
+      "name": "Project",
+      "path": "/Users/craig/Documents/CraigStuntz/LogicFiles/Tests/Resources/examples/Logicx Simple/Project.logicx",
+      "musical": {
+        "bpm": 120.0,
+        "key": "C",
+        "mode": "major",
+        "time_signature": "4/4",
+        "signature_key": 7,
+        "tempo_candidates": [
+          43.5,
+          49.32,
+          56.36,
+          59.86,
+          61.36,
+          76.96,
+          128.0,
+          128.27,
+          129.0,
+          191.0
+        ]
+      },
+      "technical": {
+        "tracks": 1,
+        "sample_rate": 48000,
+        "frame_rate_index": 1,
+        "version": 3,
+        "logic_version": "Logic Pro 12.0.1 (6590)",
+        "has_ara_plugins": false,
+        "has_grid": false,
+        "is_timecode_based": false
+      },
+      "audio_counts": {
+        "audio_files": 0,
+        "sampler_instruments": 0,
+        "quicksampler_files": 0,
+        "impulse_responses": 0,
+        "alchemy_files": 0,
+        "ultrabeat_files": 0,
+        "playback_files": 0,
+        "unused_audio_files": 0,
+        "total_samples": 0
+      },
+      "track_info": {
+        "track_names": [
+          "Audio 1",
+          "Audio 2",
+          "Audio 3"
+        ],
+        "track_count_found": 3,
+        "region_names": [],
+        "region_count_found": 0
+      },
+      "plugin_data": {
+        "plugins": [
+          "Retro Synth",
+          "$Automatic-Vintage Synth 8 Single Row"
+        ],
+        "plugin_count": 2,
+        "presets": [],
+        "preset_count": 0,
+        "alchemy_references": [],
+        "alchemy_ref_count": 0
+      },
+      "binary_data": {
+        "chunk_counts": {
+          "Track": 22,
+          "EventSequence": 13,
+          "MIDISequence": 13,
+          "Instrument": 1,
+          "TextStyle": 32,
+          "CoreMIDI": 2
+        },
+        "total_chunks": 83
+      },
+      "errors": []
+    }
+  ]
+}

@@ -15,12 +15,12 @@ public struct Patch: Codable, Sendable, LogicFileBundle {
   public static let pathExtension = "patch"
 
   /// The root channel strip (`#Root.cst`).
-  public let rootChannelStrip: Cst
+  public var rootChannelStrip: Cst
   /// Additional channel strips, keyed by filename (including `.cst` extension).
   /// Non-empty only for summing stacks.
-  public let additionalChannelStrips: [String: Cst]
+  public var additionalChannelStrips: [String: Cst]
   /// Channel strip surface settings parsed from `data.plist`.
-  public let patchData: PatchData
+  public var patchData: PatchData
 
   /// Load a patch bundle from disk.
   ///

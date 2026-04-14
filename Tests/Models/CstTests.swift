@@ -163,13 +163,13 @@ import Testing
     return
   }
 
-  let originalPluginCount = cst.pluginCount
+  let originalPluginCount = cst.plugins.count
 
-  cst.replacePlugin(at: 0, with: donorInstrument)
+  cst.plugins[0].setting = donorInstrument
 
   let mutatedData = try cst.data()
   let reparsed = try Cst(data: mutatedData)
-  #expect(reparsed.pluginCount == originalPluginCount, "Plugin count should be preserved")
+  #expect(reparsed.plugins.count == originalPluginCount, "Plugin count should be preserved")
   #expect(reparsed.instrument != nil, "Instrument should still be present")
 
   let reround = try reparsed.data()
@@ -197,7 +197,7 @@ import Testing
   let reparsed = try Cst(data: serialized)
   #expect(reparsed.instrument != nil, "Instrument should survive round-trip")
   #expect(reparsed.audioFxPlugins.count == original.audioFxPlugins.count)
-  #expect(reparsed.pluginCount == fromScratch.pluginCount)
+  #expect(reparsed.plugins.count == fromScratch.plugins.count)
 
   let reround = try reparsed.data()
   #expect(reround == serialized, "From-scratch CST should round-trip")
@@ -223,19 +223,20 @@ import Testing
   let data = try Data(contentsOf: url)
   var cst = try Cst(data: data)
 
-  #expect(cst.presetName(at: 0) == "Antimatter Synth.pst")
+  #expect(cst.plugins[0].presetName == "Antimatter Synth.pst")
 
   let donorURL = requireTestResourceURL(
     "RS Access Codes", extension: Cst.pathExtension,
     subdirectory: "Same instrument different preset no audiofx")
   let donor = try Cst(data: try Data(contentsOf: donorURL))
 
-  cst.replacePlugin(at: 0, with: donor.instrument!, presetName: "Access Codes")
-  #expect(cst.presetName(at: 0) == "Access Codes.pst")
+  cst.plugins[0].setting = donor.instrument!
+  cst.plugins[0].presetName = "Access Codes.pst"
+  #expect(cst.plugins[0].presetName == "Access Codes.pst")
 
   let serialized = try cst.data()
   let reparsed = try Cst(data: serialized)
-  #expect(reparsed.presetName(at: 0) == "Access Codes.pst")
+  #expect(reparsed.plugins[0].presetName == "Access Codes.pst")
   #expect(try reparsed.data() == serialized)
 }
 
@@ -245,9 +246,7 @@ import Testing
   let csData = try Data(contentsOf: channelStripURL)
   let template = try Cst(data: csData)
 
-  let allPlugins =
-    [template.instrument].compactMap { $0 } + template.midiPlugins + template.audioFxPlugins
-  let cloned = Cst(cloningStructureOf: template, replacingPluginsWith: allPlugins)
+  let cloned = Cst(cloningStructureOf: template, replacingPluginsWith: template.plugins)
 
   let clonedData = try cloned.data()
   #expect(clonedData == csData, "Cloning with same plugins should produce identical bytes")
@@ -257,9 +256,9 @@ import Testing
     subdirectory: "Same instrument different preset no audiofx")
   let donor = try Cst(data: try Data(contentsOf: antimatterURL))
 
-  var newPlugins = allPlugins
+  var newPlugins = template.plugins
   if let donorInst = donor.instrument {
-    newPlugins[0] = donorInst
+    newPlugins[0].setting = donorInst
   }
   let swapped = Cst(cloningStructureOf: template, replacingPluginsWith: newPlugins)
   let swappedData = try swapped.data()
@@ -267,7 +266,7 @@ import Testing
   let reparsed = try Cst(data: swappedData)
   let reround = try reparsed.data()
   #expect(reround == swappedData, "Cloned CST should round-trip")
-  #expect(reparsed.pluginCount == template.pluginCount)
+  #expect(reparsed.plugins.count == template.plugins.count)
 }
 
 @Test func testCstCodable() throws {
@@ -285,8 +284,7 @@ import Testing
 
   #expect(try decodedCst.data() == (try originalCst.data()))
   #expect((decodedCst.instrument != nil) == (originalCst.instrument != nil))
-  #expect(decodedCst.midiPlugins.count == originalCst.midiPlugins.count)
-  #expect(decodedCst.audioFxPlugins.count == originalCst.audioFxPlugins.count)
+  #expect(decodedCst.plugins.count == originalCst.plugins.count)
 }
 
 @Test func testAudioInputMonoInput1() throws {

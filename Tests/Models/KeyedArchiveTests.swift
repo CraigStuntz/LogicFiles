@@ -53,6 +53,25 @@ private let channelStripSubdir = "Retro Synth Defaults"
   #expect(try decoded.data() == blob)
 }
 
+@Test func testKeyedArchiveObjectRoundTrip() throws {
+  let blob = try keyedArchiveBlob(
+    resource: "Channel Strip", subdirectory: channelStripSubdir, atFileOffset: 11146)
+  let archive = try KeyedArchive(data: blob)
+  let reparsed = try KeyedArchive(data: archive.data())
+  // Verify typed fields survive object→data→object.
+  #expect(reparsed.decoded.keys == archive.decoded.keys)
+  guard let origLayer = archive.environmentLayer,
+    let reparsedLayer = reparsed.environmentLayer
+  else {
+    #expect(Bool(false), "Both should have an MAKeyboardLayer")
+    return
+  }
+  #expect(reparsedLayer.lowNote == origLayer.lowNote)
+  #expect(reparsedLayer.highNote == origLayer.highNote)
+  #expect(reparsedLayer.transpose == origLayer.transpose)
+  #expect(reparsedLayer.velocityResponseGraph.count == origLayer.velocityResponseGraph.count)
+}
+
 // MARK: - decoded dict
 
 @Test func testKeyedArchiveDecodedTopKeys() throws {

@@ -17,23 +17,39 @@ public struct Aupreset: Codable, Sendable, LogicFileData {
   public static let pathExtension = "aupreset"
 
   /// The plist format (binary or XML).
-  public let format: PropertyListSerialization.PropertyListFormat
+  public var format: PropertyListSerialization.PropertyListFormat
   /// The preset name.
-  public let name: String
+  public var name: String {
+    didSet { setPlist("name", value: name) }
+  }
   /// Four-byte manufacturer code, stored as an integer.
-  public let manufacturer: Int
+  public var manufacturer: Int {
+    didSet { setPlist("manufacturer", value: manufacturer) }
+  }
   /// AU plugin type code (e.g. effect, instrument).
-  public let type: Int
+  public var type: Int {
+    didSet { setPlist("type", value: type) }
+  }
   /// AU plugin subtype code identifying the specific plugin.
-  public let subtype: Int
+  public var subtype: Int {
+    didSet { setPlist("subtype", value: subtype) }
+  }
   /// Preset format version.
-  public let version: Int
+  public var version: Int {
+    didSet { setPlist("version", value: version) }
+  }
   /// The embedded plugin parameter data, from the `"data"` key of the plist.
-  public let payload: Data?
+  public var payload: Data? {
+    didSet { setPlist("data", value: payload) }
+  }
   /// MIDI mono mode setting. Present on some plugins.
-  public let midiMonoMode: Int?
+  public var midiMonoMode: Int? {
+    didSet { setPlist("midiMonoMode", value: midiMonoMode) }
+  }
   /// Mono mode pitch range in semitones. Present on some plugins.
-  public let monoModePitchRange: Int?
+  public var monoModePitchRange: Int? {
+    didSet { setPlist("monoModePitchRange", value: monoModePitchRange) }
+  }
 
   // Full parsed plist stored for faithful round-trip serialization, preserving any
   // fields not yet modeled as typed properties above.
@@ -117,6 +133,16 @@ public struct Aupreset: Codable, Sendable, LogicFileData {
       }
       self = replaced
     }
+  }
+
+  private mutating func setPlist(_ key: String, value: Any?) {
+    var dict = plist.storage
+    if let value = value {
+      dict[key] = value
+    } else {
+      dict.removeValue(forKey: key)
+    }
+    plist = PlistDict(dict)
   }
 
   /// Returns a new `Aupreset` with the payload replaced, preserving all other plist keys.

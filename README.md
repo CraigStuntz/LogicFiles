@@ -1,14 +1,11 @@
 # LogicFiles
 
 A Swift library for reading and writing [Apple Logic Pro](https://www.apple.com/logic-pro/) 
-file formats: `.cst`, `.aupreset`, `.pst`, and `.patch`. Also! This project 
-represents the only in-depth documentation of 
-these file formats I've found anywhere on the web. I would be _delighted_ to be 
-wrong about this; please open an issue and tell me if you know of any!
-
-Notably absent: This library has no support for `.logicx`, the Logic Pro project 
-format. A `.logicx` file is just a bundle, however, and this project might be 
-helpful if you need to read those, anyway!
+file formats: `.cst`, `.aupreset`, `.pst`, `.patch`, and `.logicx`. Also! This 
+project represents the only in-depth documentation of these file formats I've 
+found anywhere on the web, besides [logicx-analyzer](https://github.com/geoffmyers/logicx-analyzer/). 
+I would be _delighted_ to be wrong about this; please 
+open an issue and tell me if you know of any!
 
 Requires macOS 13+ / iOS 16+, Swift 6 language mode. Built with Swift Package 
 Manager. Tests are in [Swift Testing](https://github.com/swiftlang/swift-testing).
@@ -29,6 +26,7 @@ swift run logicfiles info <file>   # Run the CLI tool
 |------|-----------|-------|
 | [Aupreset](Sources/Models/AUPRESET_FORMAT.md) | `.aupreset` | AU Preset; wraps a binary or XML plist |
 | [Cst](Sources/Models/CST_FORMAT.md) | `.cst` | Channel Strip; contains ordered plugin settings |
+| [Logicx](Sources/Models/LOGICX_FORMAT.md) | `.logicx` | Logic Pro project; saved as a package bundle (`.logicx` directory) or a project folder (plain directory containing a `.logicx` sub-bundle). Contains project information, alternatives with track data, metadata, and display state |
 | [Patch](Sources/Models/PATCH_FORMAT.md) | `.patch` | Patch bundle (directory); delegates per contained file type |
 | [Pst](Sources/Models/PST_FORMAT.md) | `.pst` | Logic Pro Preset; fixed binary format with GAMETSPP header. Nested payloads may use emagic, chunked, or raw sub-formats (see `tryParsePreset()`) |
 
@@ -47,8 +45,10 @@ Cst.matches(pathExtension: "CST")  // true (case-insensitive)
 Flat file types (`Pst`, `Aupreset`, `Cst`) also conform to `LogicFileData`, which adds
 `init(data:) throws` for parsing and `func data() throws -> Data` for serialization.
 
-Bundle types (`Patch`) conform to `LogicFileBundle`, which adds
+Bundle types (`Patch`, `Logicx`) conform to `LogicFileBundle`, which adds
 `init(contentsOf:) throws` for loading and `func write(to:) throws` for saving.
+`Logicx` additionally offers `write(to:as:)` with a `LogicxStorageFormat` argument
+(`.bundle` or `.folder`) to control the on-disk layout.
 
 ### Reading a file
 
@@ -76,6 +76,31 @@ let patch = try Patch(contentsOf: patchURL)
 print(patch.rootChannelStrip)          // Cst
 print(patch.additionalChannelStrips)   // [String: Cst] — for summing stacks
 print(patch.patchData)                 // PatchData — fader, pan, sends, etc.
+
+// Read a Logic Pro project — auto-detects package (.logicx bundle) or folder format
+let logicx = try Logicx(contentsOf: logicxURL)
+print(logicx.projectInformation.lastSavedFrom)    // e.g. "Logic Pro 12.0.1"
+print(logicx.projectInformation.hasProjectFolder) // true if saved as a folder
+print(logicx.audioFilesURL as Any)                // URL of Audio Files dir, or nil
+for (id, alt) in logicx.alternatives {
+    print("Alternative \(id):")
+    print("  Tempo: \(alt.metaData.beatsPerMinute) BPM")
+    print("  Key: \(alt.metaData.songKey) \(alt.metaData.songGenderKey)")
+    print("  Tracks: \(alt.metaData.numberOfTracks)")
+
+    // Session Player track characters
+    for state in alt.sessionPlayerTrackStates() {
+        print("  Session Player: \(state.characterIdentifier)")
+    }
+
+    // Session Player region presets
+    for preset in alt.sessionPlayerPresets() {
+        print("  Preset: \(preset.name) (\(preset.characterIdentifier))")
+        if let intensity = preset.parameters.intensity {
+            print("    Intensity: \(intensity)")
+        }
+    }
+}
 ```
 
 ### Writing a file
@@ -89,6 +114,13 @@ try (try aupreset.data()).write(to: outputURL)
 // Write a Patch bundle to a new location
 let patch = try Patch(contentsOf: inputURL)
 try patch.write(to: outputURL)
+
+// Write a Logic Pro project as a package bundle (default)
+let logicx = try Logicx(contentsOf: inputURL)
+try logicx.write(to: outputURL)
+
+// Write as a project folder instead
+try logicx.write(to: outputURL, as: .folder)
 ```
 
 Round-trip fidelity is a core invariant: `init(data:)` followed by `data()` produces byte-for-byte identical output.
@@ -106,20 +138,22 @@ Each plugin in a `.cst` is represented as a `PluginSetting` enum:
 
 ### Replacing and cloning plugins
 
-The `Cst` type supports in-place plugin replacement and structural cloning:
+Each plugin slot is exposed as a `CstPlugin` value with a `setting` (the plugin
+payload) and a `presetName` (the filename Logic Pro displays, e.g.
+`"Access Codes.pst"`). Mutate them directly via the `plugins` array:
 
 ```swift
 // Replace the instrument in a channel strip
 var cst = try Cst(data: try Data(contentsOf: baseURL))
 let donor = try Cst(data: try Data(contentsOf: donorURL))
-cst.replacePlugin(at: 0, with: donor.instrument!)
+cst.plugins[0].setting = donor.instrument!
 try (try cst.data()).write(to: outputURL)
 
-// Optionally set the preset name that Logic displays
-cst.replacePlugin(at: 0, with: donor.instrument!, presetName: "My Preset")
+// Also update the preset name Logic displays
+cst.plugins[0].presetName = "My Preset.pst"
 
 // Read the preset name Logic displays for a plugin slot
-let name = cst.presetName(at: 0)  // String?
+let name = cst.plugins[0].presetName  // String?
 ```
 
 For building new CSTs that Logic will accept, clone an existing file's structure
@@ -128,9 +162,7 @@ For building new CSTs that Logic will accept, clone an existing file's structure
 ```swift
 // Clone template's structure, replace its plugins
 let template = try Cst(data: try Data(contentsOf: templateURL))
-let plugins = [template.instrument].compactMap { $0 }
-    + template.midiPlugins + template.audioFxPlugins
-let cloned = Cst(cloningStructureOf: template, replacingPluginsWith: plugins)
+let cloned = Cst(cloningStructureOf: template, replacingPluginsWith: template.plugins)
 ```
 
 To build a CST entirely from scratch (without cloning an existing file):
@@ -263,7 +295,8 @@ strip that has the effects chain you want to keep:
 var base = try Cst(data: Data(contentsOf: baseURL))
 let donor = try Cst(data: Data(contentsOf: donorURL))
 
-base.replacePlugin(at: 0, with: donor.instrument!, presetName: "My Alchemy Pad")
+base.plugins[0].setting = donor.instrument!
+base.plugins[0].presetName = "My Alchemy Pad.aupreset"
 try (try base.data()).write(to: outputURL)
 // outputURL now has donor's instrument + base's MIDI FX and audio FX
 ```
@@ -372,9 +405,8 @@ for this project.
 
 ## Future enhancements
 
-- **Support `.logicx` files** - Non-support for `.logicx` files feels like an 
-  obvious omission, although I don't personally need it
 - **Performance** — lazy parsing for large files
+- **Fuzzing** — fuzz test parsers to ensure malformed files correctly handled
 
 ## AI use
 

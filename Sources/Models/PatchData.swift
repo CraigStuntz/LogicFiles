@@ -3,14 +3,21 @@ import Foundation
 /// The top-level structure of a Logic Pro patch bundle's `data.plist` file.
 public struct PatchData: Codable, Sendable {
   /// Logic Pro format version.
-  public let versionPatches: Int
+  public var versionPatches: Int {
+    didSet { updatePlist("VersionPatches", value: versionPatches) }
+  }
   /// Per-channel settings, one entry per `.cst` file in the patch.
-  public let channels: [PatchChannelSettings]
+  public var channels: [PatchChannelSettings] {
+    didSet { updatePlist("channels", value: channels.map { $0.toPlistDict() }) }
+  }
 
   // Full parsed plist stored for faithful round-trip serialization, preserving any
   // fields not yet modeled as typed properties above.
-  private let plist: PlistDict
-  private let format: PropertyListSerialization.PropertyListFormat
+  private var plist: PlistDict
+  private var format: PropertyListSerialization.PropertyListFormat
+  // Original bytes when loaded from disk; nil when constructed programmatically.
+  // Cleared when a property is mutated so that data() re-serializes from the dictionary.
+  private var raw: Data?
 
   /// Parse patch data from raw plist bytes.
   ///
@@ -24,6 +31,7 @@ public struct PatchData: Codable, Sendable {
     }
     self.plist = PlistDict(dict)
     self.format = fmt
+    self.raw = data
     let content = try PropertyListDecoder().decode(Content.self, from: data)
     self.versionPatches = content.versionPatches
     self.channels = content.channels
@@ -31,10 +39,19 @@ public struct PatchData: Codable, Sendable {
 
   /// Serialize the patch data back to plist bytes.
   ///
-  /// Preserves the original plist format and any unknown keys not modeled as typed properties.
+  /// Returns the original bytes verbatim when loaded from disk; re-serializes from
+  /// the parsed plist when constructed programmatically or when a property has been mutated.
   public func data() throws -> Data {
-    try PropertyListSerialization.data(
+    if let raw { return raw }
+    return try PropertyListSerialization.data(
       fromPropertyList: plist.storage, format: format, options: 0)
+  }
+
+  private mutating func updatePlist(_ key: String, value: Any) {
+    var dict = plist.storage
+    dict[key] = value
+    plist = PlistDict(dict)
+    raw = nil
   }
 
   private struct Content: Decodable {
@@ -71,44 +88,44 @@ extension PatchData {
 /// surface-level settings (name, routing, mute/solo state, etc.) from `data.plist`.
 public struct PatchChannelSettings: Codable, Sendable {
   /// Filename of the corresponding `.cst` file (e.g. `"#Root.cst"`).
-  public let filename: String
+  public var filename: String
   /// Unique identifier for this channel strip.
-  public let uuid: UUID
+  public var uuid: UUID
   /// Display name shown in the channel strip.
-  public let name: String
+  public var name: String
   /// `true` for the root channel strip; absent (i.e. `false`) for additional strips.
-  public let isRoot: Bool
+  public var isRoot: Bool
   /// Whether the channel strip is muted.
-  public let isMuted: Bool
+  public var isMuted: Bool
   /// Whether the channel strip is soloed.
-  public let isSolo: Bool
+  public var isSolo: Bool
   /// Logic Pro internal instrument identifier. Meaning of specific values is unknown.
-  public let instrID: Int
+  public var instrID: Int
   /// Index of the channel strip's audio input.
-  public let inputIndex: Int
+  public var inputIndex: Int
   /// Whether the input is a bus rather than a physical input.
-  public let inputIsBus: Bool
+  public var inputIsBus: Bool
   /// Whether the audio input is stereo. `nil` when absent (e.g. MIDI/instrument channel strips).
-  public let inputIsStereo: Bool?
+  public var inputIsStereo: Bool?
   /// Index of the channel strip's audio output.
-  public let outputIndex: Int
+  public var outputIndex: Int
   /// Whether the output is a bus rather than a physical output.
-  public let outputIsBus: Bool
+  public var outputIsBus: Bool
   /// Whether the output is stereo. Absent for some channel configurations (e.g. multichannel).
-  public let outputIsStereo: Bool?
+  public var outputIsStereo: Bool?
   /// MIDI receive channel for this channel strip.
-  public let receiveChannel: Int
+  public var receiveChannel: Int
   /// Color index used in the arrange/mixer view.
-  public let seqColorIndex: Int
+  public var seqColorIndex: Int
   /// Icon index for the track header in the arrange window.
-  public let trackIcon: Int
+  public var trackIcon: Int
   /// Whether the user has manually edited the Smart Controls mapping.
-  public let userDidModifySmartControls: Bool
+  public var userDidModifySmartControls: Bool
   /// Channel strip category. Present on root strips; absent on additional strips in summing stacks.
-  public let chaStrCategory: String?
+  public var chaStrCategory: String?
   /// Send slot configurations. The populated structure is unknown; all available
   /// examples contain empty send slots.
-  public let sends: [PatchSend]
+  public var sends: [PatchSend]
 
   /// The selected hardware audio input, if any.
   ///
@@ -177,3 +194,33 @@ public struct PatchChannelSettings: Codable, Sendable {
 /// The populated structure is unknown — all available examples have empty send slots.
 /// Expand this type when populated examples are available.
 public struct PatchSend: Codable, Sendable {}
+
+extension PatchChannelSettings {
+  /// Re-encode to the plist dictionary representation used in `data.plist`.
+  ///
+  /// Mirrors the CodingKeys mapping so that mutations to typed properties are
+  /// correctly reflected when `PatchData.data()` re-serializes the plist.
+  fileprivate func toPlistDict() -> [String: Any] {
+    var dict: [String: Any] = [:]
+    dict["Filename"] = filename
+    dict["UUID"] = uuid.uuidString
+    dict["Channel_name"] = name
+    if isRoot { dict["Root"] = true }
+    dict["Channel_isMuted"] = isMuted
+    dict["Channel_isSolo"] = isSolo
+    dict["Channel_instID"] = instrID
+    dict["Channel_inputIndex_1"] = inputIndex
+    dict["Channel_inputIsBus"] = inputIsBus
+    if let v = inputIsStereo { dict["Channel_inputIsStereo"] = v }
+    dict["Channel_outputIndex"] = outputIndex
+    dict["Channel_outputIsBus"] = outputIsBus
+    if let v = outputIsStereo { dict["Channel_outputIsStereo"] = v }
+    dict["Channel_receiveChannel"] = receiveChannel
+    dict["Channel_seqColorIndex"] = seqColorIndex
+    dict["Track_icon"] = trackIcon
+    dict["Channel_userDidModifySmartControls"] = userDidModifySmartControls
+    if let v = chaStrCategory { dict["Channel_chaStrCategory"] = v }
+    dict["Channel_sends"] = sends.map { _ in [String: Any]() }
+    return dict
+  }
+}

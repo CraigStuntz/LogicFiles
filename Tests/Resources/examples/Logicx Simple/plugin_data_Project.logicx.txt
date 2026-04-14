@@ -1,0 +1,48 @@
+================================================================================
+Plugin & Data Extraction: ProjectData
+================================================================================
+
+PLUGINS/INSTRUMENTS DETECTED:
+--------------------------------------------------------------------------------
+  - $Automatic-Vintage Synth 8 Single Row
+  - Retro Synth
+  - Vintage Synth
+
+Total: 3 unique plugins
+
+PRESETS FOUND:
+--------------------------------------------------------------------------------
+
+Total: 0 preset configurations
+
+AUDIO FILE REFERENCES:
+--------------------------------------------------------------------------------
+
+Total: 0 unique audio files
+
+TEMPO/BPM DATA:
+--------------------------------------------------------------------------------
+    40.00 BPM at offset 00009a74 (little)
+    40.07 BPM at offset 0001aaa8 (little)
+    40.11 BPM at offset 00004e78 (little)
+    43.50 BPM at offset 0001a85c (big)
+    43.80 BPM at offset 00005d5c (little)
+    48.32 BPM at offset 0001ae28 (little)
+    49.08 BPM at offset 0001b0e8 (little)
+    49.32 BPM at offset 0001a08c (big)
+    50.33 BPM at offset 0001a9e4 (little)
+    56.36 BPM at offset 00005134 (big)
+    59.86 BPM at offset 00006518 (big)
+    61.36 BPM at offset 00009b64 (big)
+    76.96 BPM at offset 0001ad04 (big)
+    88.58 BPM at offset 00001444 (little)
+   110.30 BPM at offset 00001e78 (little)
+   128.00 BPM at offset 0000cd0c (little)
+   128.02 BPM at offset 0001b080 (little)
+   128.03 BPM at offset 0001a464 (little)
+   128.04 BPM at offset 0001a338 (little)
+   128.26 BPM at offset 00008ae4 (little)
+
+Total: 47 unique tempo values found
+
+================================================================================

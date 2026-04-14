@@ -11,7 +11,8 @@ private typealias ParsedRep = (url: URL, data: Data, pst: Pst?, au: Aupreset?, c
 /// when SPM doesn't expose the nested directory into the test bundle.
 private func collectExampleURLs(thisFile: String = #file) -> [URL] {
   let bundleURLs =
-    Bundle.module.urls(forResourcesWithExtension: nil, subdirectory: "examples") ?? []
+    (Bundle.module.urls(forResourcesWithExtension: nil, subdirectory: "examples") ?? [])
+    .filter { !$0.lastPathComponent.hasPrefix(".") }
   if !bundleURLs.isEmpty { return bundleURLs }
 
   let resourcesDir = URL(fileURLWithPath: thisFile)
@@ -19,7 +20,8 @@ private func collectExampleURLs(thisFile: String = #file) -> [URL] {
     .appendingPathComponent("Resources/examples")
   guard FileManager.default.fileExists(atPath: resourcesDir.path),
     let enumerator = FileManager.default.enumerator(
-      at: resourcesDir, includingPropertiesForKeys: nil)
+      at: resourcesDir, includingPropertiesForKeys: nil,
+      options: [.skipsHiddenFiles])
   else { return [] }
 
   var urls: [URL] = []
@@ -112,6 +114,79 @@ private func assertPluginSlotsRecognized(in cst: Cst, context: String) {
         Bool(false),
         "Unrecognized plugin format (.unknown) in \(context) — investigate what data is at this block"
       )
+    }
+  }
+}
+
+/// Returns URLs of `.logicx` bundles found directly under `exampleURL`.
+/// SPM flattens bundle resources, so this only returns results in the workspace.
+private func logicxBundleURLs(in exampleURL: URL) throws -> [URL] {
+  guard FileManager.default.fileExists(atPath: exampleURL.path) else { return [] }
+  let children = try FileManager.default.contentsOfDirectory(
+    at: exampleURL, includingPropertiesForKeys: nil, options: [.skipsHiddenFiles])
+  return children.filter { child in
+    var isDir: ObjCBool = false
+    return FileManager.default.fileExists(atPath: child.path, isDirectory: &isDir)
+      && isDir.boolValue
+      && child.lastPathComponent.hasSuffix(".\(Logicx.pathExtension)")
+  }
+}
+
+/// Parses a `.logicx` bundle and verifies two round-trips:
+/// 1. Filesystem: `write(to:)` then re-read — each file must be byte-for-byte identical.
+/// 2. Codable: JSON encode → decode → `write(to:)` then re-read — each file must be byte-for-byte identical.
+private func roundTripLogicx(at url: URL) throws {
+  let logicx = try Logicx(contentsOf: url)
+  try assertLogicxFilesMatch(original: url, written: writeLogicx(logicx))
+
+  let codableRoundTripped = try JSONDecoder().decode(
+    Logicx.self, from: JSONEncoder().encode(logicx))
+  try assertLogicxFilesMatch(original: url, written: writeLogicx(codableRoundTripped))
+}
+
+private func writeLogicx(_ logicx: Logicx) throws -> URL {
+  let tempURL = FileManager.default.temporaryDirectory
+    .appendingPathComponent(UUID().uuidString + ".\(Logicx.pathExtension)")
+  try logicx.write(to: tempURL)
+  return tempURL
+}
+
+private func assertLogicxFilesMatch(original: URL, written tempURL: URL) throws {
+  defer { try? FileManager.default.removeItem(at: tempURL) }
+
+  // Resources/ProjectInformation.plist
+  let origInfo = try Data(
+    contentsOf: original.appendingPathComponent("Resources/ProjectInformation.plist"))
+  let writtenInfo = try Data(
+    contentsOf: tempURL.appendingPathComponent("Resources/ProjectInformation.plist"))
+  #expect(
+    origInfo == writtenInfo,
+    "Logicx ProjectInformation.plist round-trip failed for \(original.lastPathComponent)")
+
+  // Compare each alternative's files
+  let logicx = try Logicx(contentsOf: original)
+  for altName in logicx.alternatives.keys {
+    let origAlt = original.appendingPathComponent("Alternatives/\(altName)")
+    let writtenAlt = tempURL.appendingPathComponent("Alternatives/\(altName)")
+
+    for filename in [
+      "ProjectData", "MetaData.plist", "DisplayState.plist", "DisplayStateArchive",
+    ] {
+      let origFile = try Data(contentsOf: origAlt.appendingPathComponent(filename))
+      let writtenFile = try Data(contentsOf: writtenAlt.appendingPathComponent(filename))
+      #expect(
+        origFile == writtenFile,
+        "Logicx \(filename) round-trip failed for \(original.lastPathComponent)/\(altName)")
+    }
+
+    let windowImageURL = origAlt.appendingPathComponent("WindowImage.jpg")
+    if FileManager.default.fileExists(atPath: windowImageURL.path) {
+      let origImage = try Data(contentsOf: windowImageURL)
+      let writtenImage = try Data(
+        contentsOf: writtenAlt.appendingPathComponent("WindowImage.jpg"))
+      #expect(
+        origImage == writtenImage,
+        "Logicx WindowImage.jpg round-trip failed for \(original.lastPathComponent)/\(altName)")
     }
   }
 }
@@ -282,6 +357,10 @@ private func unknownClasses(in value: Any) -> [String] {
 private func verifyExampleFolder(exampleURL: URL, items: [URL]) throws {
   let channelStrips = items.filter { ["cst", "patch"].contains($0.pathExtension.lowercased()) }
   let childAUFiles = items.filter { ["pst", "aupreset"].contains($0.pathExtension.lowercased()) }
+
+  // Logicx bundles
+  let logicxBundles = try logicxBundleURLs(in: exampleURL)
+  for bundle in logicxBundles { try roundTripLogicx(at: bundle) }
 
   if !channelStrips.isEmpty {
     let patchBundles = try patchBundleURLs(in: exampleURL)

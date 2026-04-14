@@ -98,6 +98,21 @@ private enum CstBlock: Sendable {
   }
 }
 
+/// A plugin slot in a CST channel strip, combining the plugin payload with
+/// the preset filename that Logic Pro displays in the channel strip header.
+public struct CstPlugin: Codable, Sendable {
+  /// The plugin data (PST binary or AU Preset plist).
+  public var setting: PluginSetting
+  /// The filename Logic Pro displays for this slot (e.g. `"Access Codes.pst"`),
+  /// or `nil` if the block has no filename field.
+  public var presetName: String?
+
+  public init(setting: PluginSetting, presetName: String? = nil) {
+    self.setting = setting
+    self.presetName = presetName
+  }
+}
+
 /// Represents a Logic Pro Channel Strip (CST) file.
 ///
 /// A CST file contains an **ordered collection** of plugin settings (PST and AU Preset files).
@@ -126,9 +141,36 @@ public struct Cst: Codable, Sendable, LogicFileData {
 
   // MARK: - Public plugin properties (computed from blocks)
 
-  /// All user-visible parseable plugin settings in signal-flow order (system blocks excluded).
-  private var pluginSettings: [PluginSetting] {
-    blocks.compactMap { $0.pluginSetting }.filter { !$0.isSystemBlock }
+  /// All user-visible plugins in signal-flow order (system blocks excluded).
+  ///
+  /// Each element pairs the plugin payload with the preset filename Logic Pro displays.
+  /// Assigning to this property replaces plugin payloads and updates preset filenames
+  /// in the UCuA block prefixes. The count of the new value must equal the count of
+  /// the existing value (you cannot add or remove plugin slots this way).
+  public var plugins: [CstPlugin] {
+    get {
+      blocks.compactMap { block -> CstPlugin? in
+        guard case .plugin(let prefix, let setting, _) = block else { return nil }
+        if setting.isSystemBlock { return nil }
+        return CstPlugin(setting: setting, presetName: Cst.readPresetFilename(from: prefix))
+      }
+    }
+    set {
+      var pluginIdx = 0
+      for blockIdx in blocks.indices {
+        if case .plugin(var prefix, let existingSetting, let suffix) = blocks[blockIdx] {
+          if existingSetting.isSystemBlock { continue }
+          precondition(pluginIdx < newValue.count, "Plugin index \(pluginIdx) out of range")
+          let plugin = newValue[pluginIdx]
+          if let name = plugin.presetName {
+            Cst.writePresetFilename(into: &prefix, filename: name)
+          }
+          blocks[blockIdx] = .plugin(prefix: prefix, setting: plugin.setting, suffix: suffix)
+          pluginIdx += 1
+        }
+      }
+      precondition(pluginIdx == newValue.count, "newValue has \(newValue.count) plugins but channel strip has \(pluginIdx)")
+    }
   }
 
   /// The instrument plugin, if any (maximum one).
@@ -227,64 +269,6 @@ public struct Cst: Codable, Sendable, LogicFileData {
     return AudioInput(rawValue: ocuaHeader[valueIndex])
   }
 
-  // MARK: - Mutation
-
-  /// The number of user-visible plugin slots in this channel strip.
-  ///
-  /// Counts instruments, MIDI FX, and audio FX. Excludes system blocks such as
-  /// keyboard layers (`KeyedArchive`) and opaque infrastructure slots.
-  public var pluginCount: Int { pluginSettings.count }
-
-  /// Replace the plugin at the given index (in signal-flow order among parseable plugins).
-  ///
-  /// Index 0 is the instrument (if present), followed by audio FX plugins.
-  /// The UCuA block size field is recalculated automatically on the next call to `data()`.
-  ///
-  /// - Parameters:
-  ///   - index: Plugin index in signal-flow order.
-  ///   - newSetting: The replacement plugin data.
-  ///   - presetName: Optional preset name to display in Logic Pro (e.g. "Access Codes").
-  ///     The `.pst` or `.aupreset` extension is appended automatically based on plugin type.
-  ///     Only applies to blocks with extended prefixes (PST and named AU blocks).
-  public mutating func replacePlugin(
-    at index: Int, with newSetting: PluginSetting, presetName: String? = nil
-  ) {
-    // Map the plugin index to the corresponding block index, skipping system blocks.
-    var pluginIdx = 0
-    for blockIdx in blocks.indices {
-      if case .plugin(var prefix, let existingSetting, let suffix) = blocks[blockIdx] {
-        if existingSetting.isSystemBlock { continue }
-        if pluginIdx == index {
-          if let name = presetName {
-            Cst.writePresetFilename(into: &prefix, presetName: name, pluginType: newSetting)
-          }
-          blocks[blockIdx] = .plugin(prefix: prefix, setting: newSetting, suffix: suffix)
-          return
-        }
-        pluginIdx += 1
-      }
-    }
-    preconditionFailure("Plugin index \(index) out of range (have \(pluginIdx) plugins)")
-  }
-
-  /// The preset filename displayed by Logic Pro for the plugin at the given index,
-  /// or `nil` if the block has no filename field.
-  ///
-  /// - Parameter index: Plugin index in signal-flow order (0 = instrument or first slot).
-  public func presetName(at index: Int) -> String? {
-    var pluginIdx = 0
-    for block in blocks {
-      if case .plugin(let prefix, let setting, _) = block {
-        if setting.isSystemBlock { continue }
-        if pluginIdx == index {
-          return Cst.readPresetFilename(from: prefix)
-        }
-        pluginIdx += 1
-      }
-    }
-    return nil
-  }
-
   // MARK: - Initializers
 
   /// Parse a CST from raw file bytes.
@@ -302,7 +286,7 @@ public struct Cst: Codable, Sendable, LogicFileData {
   /// although Logic uses the UCuA block prefix metadata to identify which plugin to
   /// instantiate — for from-scratch CSTs the prefix is minimal, so Logic may not
   /// associate the correct plugin UI. For full fidelity, prefer parsing a real CST
-  /// with `init(data:)` and using `replacePlugin(at:with:)` to swap payloads.
+  /// with `init(data:)` and mutating its `plugins` property to swap payloads.
   public init(
     instrument: PluginSetting?,
     midiPlugins: [PluginSetting],
@@ -331,32 +315,24 @@ public struct Cst: Codable, Sendable, LogicFileData {
   ///
   /// The template provides the OCuA header (track type, UUIDs, slot metadata),
   /// UCuA block prefixes (plugin identification that Logic uses to instantiate the
-  /// correct plugin UI), system blocks, and footer. Only the plugin payloads are
-  /// replaced.
+  /// correct plugin UI), system blocks, and footer. Plugin payloads and preset
+  /// filenames are replaced from `newPlugins`.
   ///
   /// This is the recommended way to build CSTs that Logic Pro can fully load.
-  /// The template should have at least as many plugin slots as `newPlugins`.
   ///
   /// - Parameters:
   ///   - template: A parsed CST whose structure will be cloned.
-  ///   - newPlugins: Replacement plugin payloads in signal-flow order.
-  ///     Must have the same count as `template.pluginCount`.
-  public init(cloningStructureOf template: Cst, replacingPluginsWith newPlugins: [PluginSetting]) {
+  ///   - newPlugins: Replacement plugins in signal-flow order.
+  ///     Must have the same count as `template.plugins.count`.
+  public init(cloningStructureOf template: Cst, replacingPluginsWith newPlugins: [CstPlugin]) {
     precondition(
-      newPlugins.count == template.pluginCount,
-      "newPlugins count (\(newPlugins.count)) must match template plugin count (\(template.pluginCount))"
+      newPlugins.count == template.plugins.count,
+      "newPlugins count (\(newPlugins.count)) must match template plugin count (\(template.plugins.count))"
     )
     self.ocuaHeader = template.ocuaHeader
     self.ocuaFooter = template.ocuaFooter
     self.blocks = template.blocks
-    var pluginIdx = 0
-    for blockIdx in blocks.indices {
-      if case .plugin(let prefix, let existingSetting, let suffix) = blocks[blockIdx] {
-        if existingSetting.isSystemBlock { continue }
-        blocks[blockIdx] = .plugin(prefix: prefix, setting: newPlugins[pluginIdx], suffix: suffix)
-        pluginIdx += 1
-      }
-    }
+    self.plugins = newPlugins
   }
 
   public init(from decoder: Decoder) throws {
@@ -411,19 +387,9 @@ public struct Cst: Codable, Sendable, LogicFileData {
     return String(data: nameBytes, encoding: .utf8)
   }
 
-  /// Write a preset filename into a block prefix. Appends the appropriate
-  /// file extension (.pst or .aupreset) based on plugin type.
-  private static func writePresetFilename(
-    into prefix: inout Data, presetName: String, pluginType: PluginSetting
-  ) {
+  /// Write a preset filename into a block prefix (e.g. `"Access Codes.pst"`).
+  private static func writePresetFilename(into prefix: inout Data, filename: String) {
     guard prefix.count >= minPrefixForFilename else { return }
-    let ext: String
-    switch pluginType {
-    case .pst: ext = ".pst"
-    case .aupreset: ext = ".aupreset"
-    case .keyedArchive, .unknown: ext = ""
-    }
-    let filename = presetName + ext
     var field = Data(count: filenameRange.count)  // zero-filled
     if let nameData = filename.data(using: .utf8) {
       let copyCount = min(nameData.count, filenameRange.count - 1)  // leave room for null

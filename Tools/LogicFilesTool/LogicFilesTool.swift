@@ -65,7 +65,7 @@ func printInfo(filePath: String) throws {
     let cst = try Cst(data: data)
     print("File:       \(filePath)")
     print("Size:       \(data.count) bytes")
-    print("Plugins:    \(cst.pluginCount)")
+    print("Plugins:    \(cst.plugins.count)")
     print("Instrument: \(cst.instrument.map { pluginKind($0) } ?? "(none)")")
     print("MIDI FX:    \(cst.midiPlugins.count)")
     print("Audio FX:   \(cst.audioFxPlugins.count)")
@@ -101,7 +101,7 @@ func printInfo(filePath: String) throws {
     let patch = try Patch(contentsOf: url)
     let root = patch.rootChannelStrip
     print("File:       \(filePath)")
-    print("Root strip: \(root.pluginCount) plugins")
+    print("Root strip: \(root.plugins.count) plugins")
     if let inst = root.instrument {
       print("  Instrument: \(pluginKind(inst))")
     }
@@ -109,7 +109,7 @@ func printInfo(filePath: String) throws {
     if !patch.additionalChannelStrips.isEmpty {
       print("Additional:  \(patch.additionalChannelStrips.count) strips")
       for (name, cst) in patch.additionalChannelStrips.sorted(by: { $0.key < $1.key }) {
-        print("  \(name): \(cst.pluginCount) plugins")
+        print("  \(name): \(cst.plugins.count) plugins")
       }
     }
 
@@ -139,9 +139,9 @@ do {
       fputs("Error: donor CST has no instrument plugin\n", stderr)
       exit(1)
     }
-    print("Base:  \(args[2]) (\(baseData.count) bytes, \(cst.pluginCount) plugins)")
+    print("Base:  \(args[2]) (\(baseData.count) bytes, \(cst.plugins.count) plugins)")
     print("Donor: \(args[3])")
-    cst.replacePlugin(at: 0, with: donorInstrument)
+    cst.plugins[0].setting = donorInstrument
     let outputData = try cst.data()
     try outputData.write(to: URL(fileURLWithPath: args[4]))
     print("Wrote: \(args[4]) (\(outputData.count) bytes)")
@@ -150,7 +150,7 @@ do {
     guard args.count == 4 else { usage() }
     let sourceData = try Data(contentsOf: URL(fileURLWithPath: args[2]))
     let source = try Cst(data: sourceData)
-    print("Source: \(args[2]) (\(sourceData.count) bytes, \(source.pluginCount) plugins)")
+    print("Source: \(args[2]) (\(sourceData.count) bytes, \(source.plugins.count) plugins)")
     let fromScratch = try Cst(
       instrument: source.instrument,
       midiPlugins: source.midiPlugins,
@@ -166,19 +166,13 @@ do {
     let template = try Cst(data: templateData)
     let donorData = try Data(contentsOf: URL(fileURLWithPath: args[3]))
     let donor = try Cst(data: donorData)
-    print("Template: \(args[2]) (\(templateData.count) bytes, \(template.pluginCount) plugins)")
-    print("Donor:    \(args[3]) (\(donorData.count) bytes, \(donor.pluginCount) plugins)")
+    print("Template: \(args[2]) (\(templateData.count) bytes, \(template.plugins.count) plugins)")
+    print("Donor:    \(args[3]) (\(donorData.count) bytes, \(donor.plugins.count) plugins)")
     // Clone template's structure with its own plugins, then swap in donor's instrument.
-    let templatePlugins =
-      [template.instrument].compactMap { $0 } + template.midiPlugins + template.audioFxPlugins
-    var cloned = Cst(cloningStructureOf: template, replacingPluginsWith: templatePlugins)
-    if let donorInst = donor.instrument {
-      var presetName: String?
-      if let donorFilename = donor.presetName(at: 0) {
-        let name = (donorFilename as NSString).deletingPathExtension
-        if !name.isEmpty { presetName = name }
-      }
-      cloned.replacePlugin(at: 0, with: donorInst, presetName: presetName)
+    var cloned = Cst(cloningStructureOf: template, replacingPluginsWith: template.plugins)
+    if donor.instrument != nil {
+      cloned.plugins[0].setting = donor.plugins[0].setting
+      cloned.plugins[0].presetName = donor.plugins[0].presetName
     }
     let outputData = try cloned.data()
     try outputData.write(to: URL(fileURLWithPath: args[4]))

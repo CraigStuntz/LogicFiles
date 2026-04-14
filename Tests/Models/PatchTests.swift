@@ -145,6 +145,30 @@ private func resolvePatchURL(_ name: String, in folder: String) -> URL {
   #expect(root.audioInput == nil, "Root (bus input) should have nil audioInput")
 }
 
+// MARK: - Mutation
+
+@Test func testPatchDataChannelNameMutationReflectedInData() throws {
+  let patchURL = resolvePatchURL("Channel Strip", in: "Retro Synth Defaults")
+  var patch = try Patch(contentsOf: patchURL)
+  patch.patchData.channels[0].name = "Modified Name"
+  let reparsed = try PatchData(data: patch.patchData.data())
+  #expect(reparsed.channels[0].name == "Modified Name")
+}
+
+@Test func testPatchModifyWriteReadBack() throws {
+  let patchURL = resolvePatchURL("Channel Strip", in: "Retro Synth Defaults")
+  var patch = try Patch(contentsOf: patchURL)
+  patch.patchData.channels[0].name = "Modified Name"
+
+  let tempURL = FileManager.default.temporaryDirectory
+    .appendingPathComponent(UUID().uuidString + "." + Patch.pathExtension)
+  defer { try? FileManager.default.removeItem(at: tempURL) }
+
+  try patch.write(to: tempURL)
+  let readBack = try Patch(contentsOf: tempURL)
+  #expect(readBack.patchData.channels[0].name == "Modified Name")
+}
+
 @Test func testSummingStackPatchData() throws {
   let patchURL = resolvePatchURL("Summing Stack", in: "Summing Stack Patch")
   let patch = try Patch(contentsOf: patchURL)

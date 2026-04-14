@@ -3,7 +3,7 @@ import Testing
 
 @testable import LogicFiles
 
-@Test func testParseAUPreset() throws {
+@Test func testParseAupreset() throws {
   let url = requireTestResourceURL("PP", extension: Aupreset.pathExtension)
   let data = try Data(contentsOf: url)
   let au = try Aupreset(data: data)
@@ -12,7 +12,7 @@ import Testing
   #expect(round == data)
 }
 
-@Test func testDecodeAUPresetPayload() throws {
+@Test func testDecodeAupresetPayload() throws {
   let url = requireTestResourceURL("PP", extension: Aupreset.pathExtension)
   let data = try Data(contentsOf: url)
   let au = try Aupreset(data: data)
@@ -21,7 +21,7 @@ import Testing
   #expect(payload!.count > 0)
 }
 
-@Test func testAUPresetAnalyzePayload() throws {
+@Test func testAupresetAnalyzePayload() throws {
   let url = requireTestResourceURL("PP", extension: Aupreset.pathExtension)
   let data = try Data(contentsOf: url)
   let au = try Aupreset(data: data)
@@ -33,12 +33,22 @@ import Testing
   }
 }
 
-@Test func testAUPresetTryParsePreset() throws {
+@Test func testAupresetTryParsePreset() throws {
   let url = requireTestResourceURL("PP", extension: Aupreset.pathExtension)
   let data = try Data(contentsOf: url)
   let au = try Aupreset(data: data)
   let detection = au.tryParsePreset()
   #expect(detection.size > 0)
+}
+
+// MARK: - Mutation
+
+@Test func testAupresetNameMutationReflectedInData() throws {
+  let url = requireTestResourceURL("PP", extension: Aupreset.pathExtension)
+  var au = try Aupreset(data: try Data(contentsOf: url))
+  au.name = "Modified Name"
+  let reparsed = try Aupreset(data: au.data())
+  #expect(reparsed.name == "Modified Name")
 }
 
 @Test func testAupresetCodable() throws {
