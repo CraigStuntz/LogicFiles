@@ -32,6 +32,46 @@ let package = Package(
             path: "Tools/LogicFilesTool",
             swiftSettings: [.treatAllWarnings(as: .error)]
         ),
+        .executableTarget(
+            name: "FuzzPst",
+            dependencies: ["LogicFiles"],
+            path: "Tools/FuzzPst"
+        ),
+        .executableTarget(
+            name: "FuzzAupreset",
+            dependencies: ["LogicFiles"],
+            path: "Tools/FuzzAupreset"
+        ),
+        .executableTarget(
+            name: "FuzzCst",
+            dependencies: ["LogicFiles"],
+            path: "Tools/FuzzCst"
+        ),
+        .executableTarget(
+            name: "FuzzPatchData",
+            dependencies: ["LogicFiles"],
+            path: "Tools/FuzzPatchData"
+        ),
+        .executableTarget(
+            name: "FuzzLogicxProjectInformation",
+            dependencies: ["LogicFiles"],
+            path: "Tools/FuzzLogicxProjectInformation"
+        ),
+        .executableTarget(
+            name: "FuzzLogicxMetaData",
+            dependencies: ["LogicFiles"],
+            path: "Tools/FuzzLogicxMetaData"
+        ),
+        .executableTarget(
+            name: "FuzzLogicxDisplayState",
+            dependencies: ["LogicFiles"],
+            path: "Tools/FuzzLogicxDisplayState"
+        ),
+        .executableTarget(
+            name: "FuzzKeyedArchive",
+            dependencies: ["LogicFiles"],
+            path: "Tools/FuzzKeyedArchive"
+        ),
         .testTarget(
             name: "LogicFilesTests",
             dependencies: ["LogicFiles"],

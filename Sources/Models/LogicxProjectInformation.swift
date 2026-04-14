@@ -41,11 +41,14 @@ public struct LogicxProjectInformation: Codable, Sendable {
     self.plist = PlistDict(dict)
     self.format = fmt
     self.raw = data
-    let content = try PropertyListDecoder().decode(Content.self, from: data)
-    self.bundleVersion = content.bundleVersion
-    self.lastSavedFrom = content.lastSavedFrom
-    self.hasProjectFolder = content.hasProjectFolder
-    self.variantNames = content.variantNames
+    guard let bundleVersion = dict["BundleVersion"] as? Int,
+          let lastSavedFrom = dict["LastSavedFrom"] as? String,
+          let variantNames = dict["VariantNames"] as? [String: String]
+    else { throw LogicxProjectInformationError.invalidFormat }
+    self.bundleVersion = bundleVersion
+    self.lastSavedFrom = lastSavedFrom
+    self.hasProjectFolder = dict["HasProjectFolder"] as? Bool ?? false
+    self.variantNames = variantNames
   }
 
   /// Serialize to plist bytes.
@@ -56,26 +59,6 @@ public struct LogicxProjectInformation: Codable, Sendable {
     if let raw { return raw }
     return try PropertyListSerialization.data(
       fromPropertyList: plist.storage, format: format, options: 0)
-  }
-
-  private struct Content: Decodable {
-    let bundleVersion: Int
-    let lastSavedFrom: String
-    let hasProjectFolder: Bool
-    let variantNames: [String: String]
-    enum CodingKeys: String, CodingKey {
-      case bundleVersion = "BundleVersion"
-      case lastSavedFrom = "LastSavedFrom"
-      case hasProjectFolder = "HasProjectFolder"
-      case variantNames = "VariantNames"
-    }
-    init(from decoder: Decoder) throws {
-      let c = try decoder.container(keyedBy: CodingKeys.self)
-      bundleVersion = try c.decode(Int.self, forKey: .bundleVersion)
-      lastSavedFrom = try c.decode(String.self, forKey: .lastSavedFrom)
-      hasProjectFolder = try c.decodeIfPresent(Bool.self, forKey: .hasProjectFolder) ?? false
-      variantNames = try c.decode([String: String].self, forKey: .variantNames)
-    }
   }
 }
 

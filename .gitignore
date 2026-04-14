@@ -8,3 +8,6 @@ DerivedData/
 .netrc
 .claude/settings.local.json
 .vscode/
+/Fuzz/Corpus/
+/Fuzz/*.log
+crash-*

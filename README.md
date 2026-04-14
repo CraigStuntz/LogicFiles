@@ -403,10 +403,24 @@ A "registry" of plugin data float offsets to parameter names is also out of scop
 That might be a useful thing for someone to implement, but it is out of scope 
 for this project.
 
+## Fuzz testing
+
+The library includes [libFuzzer](https://llvm.org/docs/LibFuzzer.html)-based fuzz
+targets for all `Data`-based `init` methods. These are coverage-guided fuzzers that
+mutate inputs based on which code paths they exercise, seeded from real Logic Pro
+fixtures in `Tests/Resources/examples/`.
+
+```bash
+./Tools/run-fuzzers.sh          # Run all 8 fuzzers for 5 minutes each (parallel)
+./Tools/run-fuzzers.sh 60       # Override duration (seconds per target)
+```
+
+The fuzz targets live under `Tools/Fuzz*/` and are built with
+`-sanitize=fuzzer,address` for coverage instrumentation and AddressSanitizer.
+
 ## Future enhancements
 
 - **Performance** — lazy parsing for large files
-- **Fuzzing** — fuzz test parsers to ensure malformed files correctly handled
 
 ## AI use
 

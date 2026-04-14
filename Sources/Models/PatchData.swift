@@ -32,16 +32,11 @@ public struct PatchData: Codable, Sendable {
     self.plist = PlistDict(dict)
     self.format = fmt
     self.raw = data
-    let content = try PropertyListDecoder().decode(Content.self, from: data)
-    self.versionPatches = content.versionPatches
-    // Inject the original plist dictionaries into each channel so unknown keys
-    // survive round-trip serialization.
-    let channelDicts = (dict["channels"] as? [[String: Any]]) ?? []
-    self.channels = zip(content.channels, channelDicts).map { channel, rawDict in
-      var ch = channel
-      ch.injectPlist(rawDict)
-      return ch
-    }
+    guard let versionPatches = dict["VersionPatches"] as? Int,
+          let channelDicts = dict["channels"] as? [[String: Any]]
+    else { throw PatchDataError.invalidFormat }
+    self.versionPatches = versionPatches
+    self.channels = try channelDicts.map { try PatchChannelSettings(plistDict: $0) }
   }
 
   /// Serialize the patch data back to plist bytes.
@@ -61,14 +56,6 @@ public struct PatchData: Codable, Sendable {
     raw = nil
   }
 
-  private struct Content: Decodable {
-    let versionPatches: Int
-    let channels: [PatchChannelSettings]
-    enum CodingKeys: String, CodingKey {
-      case versionPatches = "VersionPatches"
-      case channels
-    }
-  }
 }
 
 /// Errors thrown when parsing a patch data plist.
@@ -204,10 +191,46 @@ public struct PatchChannelSettings: Codable, Sendable {
     plist = PlistDict(dict)
   }
 
-  /// Inject the original plist dictionary after Codable decoding so that
-  /// unknown keys are preserved during round-trip serialization.
-  fileprivate mutating func injectPlist(_ dict: [String: Any]) {
-    plist = PlistDict(dict)
+  /// Initialize from a raw plist dictionary, extracting typed fields and
+  /// preserving the full dictionary for round-trip serialization.
+  init(plistDict dict: [String: Any]) throws {
+    guard let filename = dict["Filename"] as? String,
+          let uuidString = dict["UUID"] as? String,
+          let uuid = UUID(uuidString: uuidString),
+          let name = dict["Channel_name"] as? String,
+          let isMuted = dict["Channel_isMuted"] as? Bool,
+          let isSolo = dict["Channel_isSolo"] as? Bool,
+          let instrID = dict["Channel_instID"] as? Int,
+          let inputIndex = dict["Channel_inputIndex_1"] as? Int,
+          let inputIsBus = dict["Channel_inputIsBus"] as? Bool,
+          let outputIndex = dict["Channel_outputIndex"] as? Int,
+          let outputIsBus = dict["Channel_outputIsBus"] as? Bool,
+          let receiveChannel = dict["Channel_receiveChannel"] as? Int,
+          let seqColorIndex = dict["Channel_seqColorIndex"] as? Int,
+          let trackIcon = dict["Track_icon"] as? Int,
+          let userDidModifySmartControls = dict["Channel_userDidModifySmartControls"] as? Bool,
+          let sendsArray = dict["Channel_sends"] as? [[String: Any]]
+    else { throw PatchDataError.invalidFormat }
+    self.filename = filename
+    self.uuid = uuid
+    self.name = name
+    self.isRoot = dict["Root"] as? Bool ?? false
+    self.isMuted = isMuted
+    self.isSolo = isSolo
+    self.instrID = instrID
+    self.inputIndex = inputIndex
+    self.inputIsBus = inputIsBus
+    self.inputIsStereo = dict["Channel_inputIsStereo"] as? Bool
+    self.outputIndex = outputIndex
+    self.outputIsBus = outputIsBus
+    self.outputIsStereo = dict["Channel_outputIsStereo"] as? Bool
+    self.receiveChannel = receiveChannel
+    self.seqColorIndex = seqColorIndex
+    self.trackIcon = trackIcon
+    self.userDidModifySmartControls = userDidModifySmartControls
+    self.chaStrCategory = dict["Channel_chaStrCategory"] as? String
+    self.sends = sendsArray.map { _ in PatchSend() }
+    self.plist = PlistDict(dict)
   }
 
   enum CodingKeys: String, CodingKey {

@@ -57,15 +57,23 @@ public struct LogicxMetaData: Codable, Sendable {
     self.plist = PlistDict(dict)
     self.format = fmt
     self.raw = data
-    let content = try PropertyListDecoder().decode(Content.self, from: data)
-    self.beatsPerMinute = content.beatsPerMinute
-    self.sampleRate = content.sampleRate
-    self.songKey = content.songKey
-    self.songGenderKey = content.songGenderKey
-    self.songSignatureNumerator = content.songSignatureNumerator
-    self.songSignatureDenominator = content.songSignatureDenominator
-    self.numberOfTracks = content.numberOfTracks
-    self.version = content.version
+    guard let beatsPerMinute = dict["BeatsPerMinute"] as? Double,
+          let sampleRate = dict["SampleRate"] as? Int,
+          let songKey = dict["SongKey"] as? String,
+          let songGenderKey = dict["SongGenderKey"] as? String,
+          let songSignatureNumerator = dict["SongSignatureNumerator"] as? Int,
+          let songSignatureDenominator = dict["SongSignatureDenominator"] as? Int,
+          let numberOfTracks = dict["NumberOfTracks"] as? Int,
+          let version = dict["Version"] as? Int
+    else { throw LogicxMetaDataError.invalidFormat }
+    self.beatsPerMinute = beatsPerMinute
+    self.sampleRate = sampleRate
+    self.songKey = songKey
+    self.songGenderKey = songGenderKey
+    self.songSignatureNumerator = songSignatureNumerator
+    self.songSignatureDenominator = songSignatureDenominator
+    self.numberOfTracks = numberOfTracks
+    self.version = version
   }
 
   /// Serialize to plist bytes.
@@ -78,26 +86,6 @@ public struct LogicxMetaData: Codable, Sendable {
       fromPropertyList: plist.storage, format: format, options: 0)
   }
 
-  private struct Content: Decodable {
-    let beatsPerMinute: Double
-    let sampleRate: Int
-    let songKey: String
-    let songGenderKey: String
-    let songSignatureNumerator: Int
-    let songSignatureDenominator: Int
-    let numberOfTracks: Int
-    let version: Int
-    enum CodingKeys: String, CodingKey {
-      case beatsPerMinute = "BeatsPerMinute"
-      case sampleRate = "SampleRate"
-      case songKey = "SongKey"
-      case songGenderKey = "SongGenderKey"
-      case songSignatureNumerator = "SongSignatureNumerator"
-      case songSignatureDenominator = "SongSignatureDenominator"
-      case numberOfTracks = "NumberOfTracks"
-      case version = "Version"
-    }
-  }
 }
 
 extension LogicxMetaData {

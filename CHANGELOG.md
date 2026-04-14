@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+* `PatchData`, `LogicxMetaData`, `LogicxDisplayState`, `LogicxProjectInformation` — eliminated a redundant `PropertyListDecoder` pass that could crash on certain malformed binary plists accepted by `PropertyListSerialization`. Typed fields are now extracted directly from the already-parsed dictionary. Found via libFuzzer coverage-guided fuzz testing.
+
+### Added
+
+* Fuzz testing infrastructure — 8 libFuzzer-based fuzz targets (one per `Data`-based `init`) under `Tools/Fuzz*/`, with a `run-fuzzers.sh` driver script. Seeded from existing test fixtures for coverage-guided mutation.
+
 ### Changed
 
 * `Cst.plugins: [CstPlugin]` — replaces `replacePlugin(at:with:presetName:)`, `presetName(at:)`, and `pluginCount`. Each slot is now a `CstPlugin` value with a `setting: PluginSetting` and a `presetName: String?` (the full filename Logic Pro displays, e.g. `"Access Codes.pst"`). Mutate directly: `cst.plugins[0].setting = donor.instrument!`. `init(cloningStructureOf:replacingPluginsWith:)` now takes `[CstPlugin]` instead of `[PluginSetting]`.

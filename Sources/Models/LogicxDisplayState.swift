@@ -37,9 +37,11 @@ public struct LogicxDisplayState: Codable, Sendable {
     self.plist = PlistDict(dict)
     self.format = fmt
     self.raw = data
-    let content = try PropertyListDecoder().decode(Content.self, from: data)
-    self.displayDataVersion = content.displayDataVersion
-    self.screensetCurrSlot = content.screensetCurrSlot
+    guard let displayDataVersion = dict["displayDataVersion"] as? Int,
+          let screensetCurrSlot = dict["screensetCurrSlot"] as? Int
+    else { throw LogicxDisplayStateError.invalidFormat }
+    self.displayDataVersion = displayDataVersion
+    self.screensetCurrSlot = screensetCurrSlot
   }
 
   /// Serialize to plist bytes.
@@ -50,11 +52,6 @@ public struct LogicxDisplayState: Codable, Sendable {
     if let raw { return raw }
     return try PropertyListSerialization.data(
       fromPropertyList: plist.storage, format: format, options: 0)
-  }
-
-  private struct Content: Decodable {
-    let displayDataVersion: Int
-    let screensetCurrSlot: Int
   }
 }
 
