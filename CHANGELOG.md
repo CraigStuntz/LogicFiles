@@ -13,7 +13,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-* Fuzz testing infrastructure — 8 libFuzzer-based fuzz targets (one per `Data`-based `init`) under `Tools/Fuzz*/`, with a `run-fuzzers.sh` driver script. Seeded from existing test fixtures for coverage-guided mutation.
+* Fuzz testing infrastructure — 8 libFuzzer-based fuzz targets (one per `Data`-based `init`) under `Tools/Fuzz*/`, with a `run-fuzzers.sh` driver script. Seeded from existing test fixtures for coverage-guided mutation. Driver accepts an optional target list (e.g. `./Tools/run-fuzzers.sh 30 FuzzCst`) and a `-j N` / `--workers N` flag to run N parallel fuzzer processes per target; defaults to `ceil(logical_cpus / num_targets)` so a single-target run saturates all cores automatically.
+* `BenchmarkCst` — release-mode executable (`Tools/BenchmarkCst/`) that loops over the CST corpus calling `Cst.init(data:)` for 10 seconds and reports iterations per second. Use with `sample` or Instruments to profile `Cst.init` without AddressSanitizer overhead. See `README.md § Performance benchmarking`.
+
+### Performance
+
+* `KeyedArchive.resolveVal` — moved the `cfUID` check (which uses string interpolation via `"\(val)"`) to after the `[String: Any]` and `[Any]` type checks. Previously, calling `"\(val)"` on an `NSDictionary` triggered `descriptionWithLocale:indent:`, which recursively formatted the entire object graph as a string on every node visit. This produced a 2× throughput improvement and a 28× reduction in heap footprint for CST files containing `KeyedArchive` blocks (342 MB → 12 MB peak RSS in the release benchmark).
+* `Cst` — magic byte sequences (`OCuA`, `UCuA`, `GAMETSPP`, `PPSTEMAG`, `<?xml`, `bplist00`, `</plist>`) are now `private static let` constants instead of being heap-allocated on every call to the parser functions that use them.
+* `Cst.readUInt32LE` — reads 4 bytes directly via `withUnsafeBytes { $0.loadUnaligned(fromByteOffset:as:) }` instead of allocating a `subdata` slice.
+* `Cst.isPstHeader` — compares the 8-byte magic field as a `UInt64` loaded via `withUnsafeBytes`, eliminating the `subdata` allocation for the comparison.
 
 ### Changed
 

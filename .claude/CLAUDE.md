@@ -5,8 +5,13 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Commands
 
 ```bash
-swift build                        # Build the library
-swift test                         # Run all tests
+swift build                                         # Build the library
+swift test                                          # Run all tests
+./Tools/run-fuzzers.sh 3600                         # Run all fuzz targets for 1 hour (see README.md § Fuzz testing)
+./Tools/run-fuzzers.sh 30 FuzzCst                   # Run a single fuzz target (auto workers)
+./Tools/run-fuzzers.sh 3600 -j 16 FuzzCst           # Run FuzzCst with 16 parallel workers for 1 hour
+swift build -c release && \
+  .build/arm64-apple-macosx/release/BenchmarkCst   # Benchmark Cst.init (see README.md § Performance benchmarking)
 ```
 
 ## Logic Pro File Types

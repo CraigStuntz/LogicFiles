@@ -411,12 +411,45 @@ mutate inputs based on which code paths they exercise, seeded from real Logic Pr
 fixtures in `Tests/Resources/examples/`.
 
 ```bash
-./Tools/run-fuzzers.sh          # Run all 8 fuzzers for 5 minutes each (parallel)
-./Tools/run-fuzzers.sh 60       # Override duration (seconds per target)
+./Tools/run-fuzzers.sh                         # All targets, auto worker count, 5 min each
+./Tools/run-fuzzers.sh 3600                    # All targets, auto workers, 1 hour each
+./Tools/run-fuzzers.sh 30 FuzzCst              # FuzzCst only, auto workers, 30 seconds
+./Tools/run-fuzzers.sh 3600 -j 16 FuzzCst      # FuzzCst with 16 parallel workers for 1 hour
+./Tools/run-fuzzers.sh 60 FuzzPst FuzzCst      # Two targets, auto workers, 60 seconds each
 ```
+
+Worker count defaults to `ceil(logical_cpus / num_targets)`, so a single-target run
+saturates all cores automatically. Pass `-j N` / `--workers N` to override.
 
 The fuzz targets live under `Tools/Fuzz*/` and are built with
 `-sanitize=fuzzer,address` for coverage instrumentation and AddressSanitizer.
+
+## Performance benchmarking
+
+`BenchmarkCst` is a plain Swift executable (no sanitizers) that exercises
+`Cst.init(data:)` in a tight loop over the real corpus in `Fuzz/Corpus/cst/`.
+Use it to get a clean profile with Instruments or `sample`.
+
+```bash
+# Build
+swift build -c release
+
+# Quick throughput check (prints iter/s after 10 seconds)
+.build/arm64-apple-macosx/release/BenchmarkCst
+
+# Profile with Instruments Time Profiler
+instruments -t "Time Profiler" -D /tmp/cst.trace \
+  .build/arm64-apple-macosx/release/BenchmarkCst
+open /tmp/cst.trace
+
+# Profile with sample (text call tree, no Xcode required)
+.build/arm64-apple-macosx/release/BenchmarkCst &
+sample $! 6 -file /tmp/cst_sample.txt
+cat /tmp/cst_sample.txt
+```
+
+The benchmark source is `Tools/BenchmarkCst/BenchmarkCst.swift`. The corpus
+must exist at `Fuzz/Corpus/cst/`; seed it by running the fuzzer at least once.
 
 ## Future enhancements
 

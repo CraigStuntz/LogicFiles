@@ -72,6 +72,12 @@ let package = Package(
             dependencies: ["LogicFiles"],
             path: "Tools/FuzzKeyedArchive"
         ),
+        .executableTarget(
+            name: "BenchmarkCst",
+            dependencies: ["LogicFiles"],
+            path: "Tools/BenchmarkCst",
+            swiftSettings: [.treatAllWarnings(as: .error)]
+        ),
         .testTarget(
             name: "LogicFilesTests",
             dependencies: ["LogicFiles"],

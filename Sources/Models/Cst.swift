@@ -521,6 +521,16 @@ public struct Cst: Codable, Sendable, LogicFileData {
     return prefix
   }
 
+  // MARK: - Magic byte constants
+
+  private static let ocuaMagic = Data("OCuA".utf8)
+  private static let ucuaMagic = Data("UCuA".utf8)
+  private static let gametsppMagic = Data("GAMETSPP".utf8)
+  private static let ppstemagMagic = Data("PPSTEMAG".utf8)
+  private static let xmlMagic = Data("<?xml".utf8)
+  private static let bplistMagic = Data("bplist00".utf8)
+  private static let plistEndMagic = Data("</plist>".utf8)
+
   // MARK: - OCuA parsing
 
   /// Parse an OCuA container into its structural components.
@@ -532,7 +542,7 @@ public struct Cst: Codable, Sendable, LogicFileData {
   private static func parseOCuA(from data: Data) throws -> (
     header: Data, blocks: [CstBlock], footer: Data
   ) {
-    guard data.count >= 4, data.prefix(4) == Data("OCuA".utf8) else {
+    guard data.count >= 4, data.prefix(4) == ocuaMagic else {
       return (data, [], Data())
     }
     guard data.count >= 32 else {
@@ -550,7 +560,7 @@ public struct Cst: Codable, Sendable, LogicFileData {
     var blocks: [CstBlock] = []
 
     while pos + 4 <= data.count {
-      guard data.subdata(in: pos..<pos + 4) == Data("UCuA".utf8) else { break }
+      guard data.subdata(in: pos..<pos + 4) == ucuaMagic else { break }
       guard pos + 32 <= data.count else { break }
 
       let blockSizeField = Int(readUInt32LE(data, at: pos + 28))
@@ -593,18 +603,13 @@ public struct Cst: Codable, Sendable, LogicFileData {
   }
 
   private static func readUInt32LE(_ data: Data, at offset: Int) -> UInt32 {
-    data.subdata(in: offset..<offset + 4)
-      .withUnsafeBytes { $0.load(as: UInt32.self).littleEndian }
+    data.withUnsafeBytes { $0.loadUnaligned(fromByteOffset: offset, as: UInt32.self).littleEndian }
   }
 
   // MARK: - Plugin data detection (unchanged from original)
 
   private static func pluginStartOffsets(in data: Data) throws -> [Int] {
     var offsets = Set<Int>()
-    let pstMagic = Data("GAMETSPP".utf8)
-    let pstMagicAlt = Data("PPSTEMAG".utf8)
-    let xmlMagic = Data("<?xml".utf8)
-    let binMagic = Data("bplist00".utf8)
 
     func addPstOffsets(for magic: Data) {
       var searchRange = data.startIndex..<data.endIndex
@@ -617,10 +622,10 @@ public struct Cst: Codable, Sendable, LogicFileData {
       }
     }
 
-    addPstOffsets(for: pstMagic)
-    addPstOffsets(for: pstMagicAlt)
+    addPstOffsets(for: gametsppMagic)
+    addPstOffsets(for: ppstemagMagic)
 
-    for magic in [xmlMagic, binMagic] {
+    for magic in [xmlMagic, bplistMagic] {
       var searchRange = data.startIndex..<data.endIndex
       while let range = data.range(of: magic, in: searchRange) {
         offsets.insert(range.lowerBound)
@@ -641,13 +646,13 @@ public struct Cst: Codable, Sendable, LogicFileData {
     for end in candidateEnds where end > start {
       let slice = data.subdata(in: start..<end)
 
-      if slice.starts(with: Data("<?xml".utf8)) {
+      if slice.starts(with: xmlMagic) {
         if let (au, exactEnd) = try Cst.parseXmlAupreset(from: data, start: start, maxEnd: end) {
           return (.aupreset(au), exactEnd)
         }
       }
 
-      if slice.starts(with: Data("bplist00".utf8)) {
+      if slice.starts(with: bplistMagic) {
         if let (au, exactEnd) = try parseBinaryAupreset(from: data, start: start, maxEnd: end) {
           return (.aupreset(au), exactEnd)
         }
@@ -680,12 +685,15 @@ public struct Cst: Codable, Sendable, LogicFileData {
 
   private static func isPstHeader(start: Int, in data: Data) -> Bool {
     guard start + 20 <= data.count else { return false }
-    let magic = data.subdata(in: start + 12..<start + 20)
-    return magic == Data("GAMETSPP".utf8) || magic == Data("PPSTEMAG".utf8)
+    return data.withUnsafeBytes { ptr in
+      let val = ptr.loadUnaligned(fromByteOffset: start + 12, as: UInt64.self)
+      return gametsppMagic.withUnsafeBytes { $0.loadUnaligned(as: UInt64.self) == val }
+        || ppstemagMagic.withUnsafeBytes { $0.loadUnaligned(as: UInt64.self) == val }
+    }
   }
 
   private static func xmlPlistEnd(in data: Data) -> Int? {
-    guard let closeRange = data.range(of: Data("</plist>".utf8)) else {
+    guard let closeRange = data.range(of: plistEndMagic) else {
       return nil
     }
     return closeRange.upperBound

@@ -219,12 +219,6 @@ public struct KeyedArchive: Codable, Sendable {
   private static func resolveVal(_ val: Any, objects: [Any], depth: Int) -> Any {
     guard depth < 32 else { return NSNull() }
 
-    // Binary plist UID: __NSCFType (CFKeyedArchiverUID)
-    if let uid = cfUID(from: val) {
-      guard uid > 0, uid < objects.count else { return NSNull() }
-      return resolveVal(objects[uid], objects: objects, depth: depth + 1)
-    }
-
     if let dict = val as? [String: Any] {
       // XML plist UID: {CF$UID: N}
       if let uid = dict["CF$UID"] as? Int {
@@ -275,6 +269,16 @@ public struct KeyedArchive: Codable, Sendable {
 
     if let arr = val as? [Any] {
       return arr.map { resolveVal($0, objects: objects, depth: depth + 1) }
+    }
+
+    // Binary plist UID: __NSCFType (CFKeyedArchiverUID).
+    // Checked last because cfUID() uses string interpolation, which is catastrophically
+    // expensive on NSDictionary (triggers recursive descriptionWithLocale:indent:).
+    // At this point val is neither a dict nor an array, so it is either a primitive
+    // (String, Number, Data, NSNull) or a UID — both cheap to format.
+    if let uid = cfUID(from: val) {
+      guard uid > 0, uid < objects.count else { return NSNull() }
+      return resolveVal(objects[uid], objects: objects, depth: depth + 1)
     }
 
     // Primitive (String, Int, Double, Bool, Data, NSNull)
