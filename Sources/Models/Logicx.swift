@@ -180,7 +180,8 @@ public struct Logicx: Sendable, LogicFileBundle {
 
     // Media/Audio Files/ (bundle format only)
     if includeMediaDirectory {
-      let audioFilesURL = url
+      let audioFilesURL =
+        url
         .appendingPathComponent("Media")
         .appendingPathComponent("Audio Files")
       if !FileManager.default.fileExists(atPath: audioFilesURL.path) {

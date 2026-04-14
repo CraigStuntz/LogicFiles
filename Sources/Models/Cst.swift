@@ -171,7 +171,9 @@ public struct Cst: Codable, Sendable, LogicFileData {
           pluginIdx += 1
         }
       }
-      precondition(pluginIdx == newValue.count, "newValue has \(newValue.count) plugins but channel strip has \(pluginIdx)")
+      precondition(
+        pluginIdx == newValue.count,
+        "newValue has \(newValue.count) plugins but channel strip has \(pluginIdx)")
     }
   }
 

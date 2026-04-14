@@ -42,8 +42,8 @@ public struct LogicxProjectInformation: Codable, Sendable {
     self.format = fmt
     self.raw = data
     guard let bundleVersion = dict["BundleVersion"] as? Int,
-          let lastSavedFrom = dict["LastSavedFrom"] as? String,
-          let variantNames = dict["VariantNames"] as? [String: String]
+      let lastSavedFrom = dict["LastSavedFrom"] as? String,
+      let variantNames = dict["VariantNames"] as? [String: String]
     else { throw LogicxProjectInformationError.invalidFormat }
     self.bundleVersion = bundleVersion
     self.lastSavedFrom = lastSavedFrom

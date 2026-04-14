@@ -11,7 +11,8 @@ import Testing
 private func logicxFixtureURL(thisFile: String = #file) -> URL? {
   // Try Bundle.module first (works when SPM copies the examples directory).
   if let examplesURL = Bundle.module.url(forResource: "examples", withExtension: nil) {
-    let candidate = examplesURL
+    let candidate =
+      examplesURL
       .appendingPathComponent("Logicx Simple")
       .appendingPathComponent("Project.logicx")
     if FileManager.default.fileExists(atPath: candidate.path) {
@@ -34,7 +35,8 @@ private func logicxFixtureURL(thisFile: String = #file) -> URL? {
 /// not the inner `.logicx` bundle).
 private func logicxFolderFixtureURL(thisFile: String = #file) -> URL? {
   if let examplesURL = Bundle.module.url(forResource: "examples", withExtension: nil) {
-    let candidate = examplesURL
+    let candidate =
+      examplesURL
       .appendingPathComponent("Logicx simple as folder")
       .appendingPathComponent("Project as folder")
     if FileManager.default.fileExists(atPath: candidate.path) {
@@ -133,7 +135,8 @@ private func logicxFolderFixtureURL(thisFile: String = #file) -> URL? {
 /// Locates the `Logicx with session player/Project with session player.logicx` fixture.
 private func logicxSessionPlayerFixtureURL(thisFile: String = #file) -> URL? {
   if let examplesURL = Bundle.module.url(forResource: "examples", withExtension: nil) {
-    let candidate = examplesURL
+    let candidate =
+      examplesURL
       .appendingPathComponent("Logicx with session player")
       .appendingPathComponent("Project with session player.logicx")
     if FileManager.default.fileExists(atPath: candidate.path) {
@@ -167,7 +170,8 @@ private func logicxSessionPlayerFixtureURL(thisFile: String = #file) -> URL? {
   #expect(identifiers.contains("Acoustic Piano - Arpeggiated"))
   #expect(identifiers.contains("Acoustic Drummer - Pop Rock"))
 
-  let piano = try #require(states.first { $0.characterIdentifier == "Acoustic Piano - Arpeggiated" })
+  let piano = try #require(
+    states.first { $0.characterIdentifier == "Acoustic Piano - Arpeggiated" })
   #expect(piano.characterTypeIdentifier == "Type_AcousticPianoV2")
   #expect(piano.isUsingProducerKit == false)
 }

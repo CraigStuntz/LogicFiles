@@ -40,7 +40,6 @@ public struct SessionPlayerParameters: Codable, Sendable {
   public var fillsAmount: Double?
   /// Pattern variation index (1–4).
   public var variation: Double?
-
 }
 
 /// A Session Player region preset embedded in `ProjectData`.
@@ -227,4 +226,3 @@ extension Data {
     return nil
   }
 }
-

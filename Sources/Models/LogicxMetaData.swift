@@ -58,13 +58,13 @@ public struct LogicxMetaData: Codable, Sendable {
     self.format = fmt
     self.raw = data
     guard let beatsPerMinute = dict["BeatsPerMinute"] as? Double,
-          let sampleRate = dict["SampleRate"] as? Int,
-          let songKey = dict["SongKey"] as? String,
-          let songGenderKey = dict["SongGenderKey"] as? String,
-          let songSignatureNumerator = dict["SongSignatureNumerator"] as? Int,
-          let songSignatureDenominator = dict["SongSignatureDenominator"] as? Int,
-          let numberOfTracks = dict["NumberOfTracks"] as? Int,
-          let version = dict["Version"] as? Int
+      let sampleRate = dict["SampleRate"] as? Int,
+      let songKey = dict["SongKey"] as? String,
+      let songGenderKey = dict["SongGenderKey"] as? String,
+      let songSignatureNumerator = dict["SongSignatureNumerator"] as? Int,
+      let songSignatureDenominator = dict["SongSignatureDenominator"] as? Int,
+      let numberOfTracks = dict["NumberOfTracks"] as? Int,
+      let version = dict["Version"] as? Int
     else { throw LogicxMetaDataError.invalidFormat }
     self.beatsPerMinute = beatsPerMinute
     self.sampleRate = sampleRate
@@ -85,7 +85,6 @@ public struct LogicxMetaData: Codable, Sendable {
     return try PropertyListSerialization.data(
       fromPropertyList: plist.storage, format: format, options: 0)
   }
-
 }
 
 extension LogicxMetaData {

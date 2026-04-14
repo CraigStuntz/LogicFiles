@@ -38,7 +38,7 @@ public struct LogicxDisplayState: Codable, Sendable {
     self.format = fmt
     self.raw = data
     guard let displayDataVersion = dict["displayDataVersion"] as? Int,
-          let screensetCurrSlot = dict["screensetCurrSlot"] as? Int
+      let screensetCurrSlot = dict["screensetCurrSlot"] as? Int
     else { throw LogicxDisplayStateError.invalidFormat }
     self.displayDataVersion = displayDataVersion
     self.screensetCurrSlot = screensetCurrSlot
