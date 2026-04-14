@@ -41,21 +41,6 @@ public struct SessionPlayerParameters: Codable, Sendable {
   /// Pattern variation index (1–4).
   public var variation: Double?
 
-  private enum CodingKeys: String, CodingKey {
-    case intensity, dynamics, humanize, swing, rComp, mComp, fillsAmount, variation
-  }
-
-  public init(from decoder: Decoder) throws {
-    let c = try decoder.container(keyedBy: CodingKeys.self)
-    intensity = try c.decodeIfPresent(Double.self, forKey: .intensity)
-    dynamics = try c.decodeIfPresent(Double.self, forKey: .dynamics)
-    humanize = try c.decodeIfPresent(Double.self, forKey: .humanize)
-    swing = try c.decodeIfPresent(Double.self, forKey: .swing)
-    rComp = try c.decodeIfPresent(Double.self, forKey: .rComp)
-    mComp = try c.decodeIfPresent(Double.self, forKey: .mComp)
-    fillsAmount = try c.decodeIfPresent(Double.self, forKey: .fillsAmount)
-    variation = try c.decodeIfPresent(Double.self, forKey: .variation)
-  }
 }
 
 /// A Session Player region preset embedded in `ProjectData`.
@@ -165,9 +150,7 @@ extension LogicxAlternative {
       let paramsData = (try? JSONSerialization.data(withJSONObject: paramsDict)) ?? Data()
       let parameters =
         (try? JSONDecoder().decode(SessionPlayerParameters.self, from: paramsData))
-        ?? SessionPlayerParameters(
-          intensity: nil, dynamics: nil, humanize: nil, swing: nil,
-          rComp: nil, mComp: nil, fillsAmount: nil, variation: nil)
+        ?? SessionPlayerParameters()
 
       results.append(
         SessionPlayerPreset(
@@ -245,20 +228,3 @@ extension Data {
   }
 }
 
-// MARK: - Memberwise init for SessionPlayerParameters (used in fallback above)
-
-extension SessionPlayerParameters {
-  fileprivate init(
-    intensity: Double?, dynamics: Double?, humanize: Double?, swing: Double?,
-    rComp: Double?, mComp: Double?, fillsAmount: Double?, variation: Double?
-  ) {
-    self.intensity = intensity
-    self.dynamics = dynamics
-    self.humanize = humanize
-    self.swing = swing
-    self.rComp = rComp
-    self.mComp = mComp
-    self.fillsAmount = fillsAmount
-    self.variation = variation
-  }
-}

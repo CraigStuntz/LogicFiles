@@ -34,7 +34,14 @@ public struct PatchData: Codable, Sendable {
     self.raw = data
     let content = try PropertyListDecoder().decode(Content.self, from: data)
     self.versionPatches = content.versionPatches
-    self.channels = content.channels
+    // Inject the original plist dictionaries into each channel so unknown keys
+    // survive round-trip serialization.
+    let channelDicts = (dict["channels"] as? [[String: Any]]) ?? []
+    self.channels = zip(content.channels, channelDicts).map { channel, rawDict in
+      var ch = channel
+      ch.injectPlist(rawDict)
+      return ch
+    }
   }
 
   /// Serialize the patch data back to plist bytes.
@@ -88,44 +95,88 @@ extension PatchData {
 /// surface-level settings (name, routing, mute/solo state, etc.) from `data.plist`.
 public struct PatchChannelSettings: Codable, Sendable {
   /// Filename of the corresponding `.cst` file (e.g. `"#Root.cst"`).
-  public var filename: String
+  public var filename: String {
+    didSet { setPlist("Filename", value: filename) }
+  }
   /// Unique identifier for this channel strip.
-  public var uuid: UUID
+  public var uuid: UUID {
+    didSet { setPlist("UUID", value: uuid.uuidString) }
+  }
   /// Display name shown in the channel strip.
-  public var name: String
+  public var name: String {
+    didSet { setPlist("Channel_name", value: name) }
+  }
   /// `true` for the root channel strip; absent (i.e. `false`) for additional strips.
-  public var isRoot: Bool
+  public var isRoot: Bool {
+    didSet {
+      if isRoot { setPlist("Root", value: true) }
+      else { removePlist("Root") }
+    }
+  }
   /// Whether the channel strip is muted.
-  public var isMuted: Bool
+  public var isMuted: Bool {
+    didSet { setPlist("Channel_isMuted", value: isMuted) }
+  }
   /// Whether the channel strip is soloed.
-  public var isSolo: Bool
+  public var isSolo: Bool {
+    didSet { setPlist("Channel_isSolo", value: isSolo) }
+  }
   /// Logic Pro internal instrument identifier. Meaning of specific values is unknown.
-  public var instrID: Int
+  public var instrID: Int {
+    didSet { setPlist("Channel_instID", value: instrID) }
+  }
   /// Index of the channel strip's audio input.
-  public var inputIndex: Int
+  public var inputIndex: Int {
+    didSet { setPlist("Channel_inputIndex_1", value: inputIndex) }
+  }
   /// Whether the input is a bus rather than a physical input.
-  public var inputIsBus: Bool
+  public var inputIsBus: Bool {
+    didSet { setPlist("Channel_inputIsBus", value: inputIsBus) }
+  }
   /// Whether the audio input is stereo. `nil` when absent (e.g. MIDI/instrument channel strips).
-  public var inputIsStereo: Bool?
+  public var inputIsStereo: Bool? {
+    didSet { setPlist("Channel_inputIsStereo", value: inputIsStereo) }
+  }
   /// Index of the channel strip's audio output.
-  public var outputIndex: Int
+  public var outputIndex: Int {
+    didSet { setPlist("Channel_outputIndex", value: outputIndex) }
+  }
   /// Whether the output is a bus rather than a physical output.
-  public var outputIsBus: Bool
+  public var outputIsBus: Bool {
+    didSet { setPlist("Channel_outputIsBus", value: outputIsBus) }
+  }
   /// Whether the output is stereo. Absent for some channel configurations (e.g. multichannel).
-  public var outputIsStereo: Bool?
+  public var outputIsStereo: Bool? {
+    didSet { setPlist("Channel_outputIsStereo", value: outputIsStereo) }
+  }
   /// MIDI receive channel for this channel strip.
-  public var receiveChannel: Int
+  public var receiveChannel: Int {
+    didSet { setPlist("Channel_receiveChannel", value: receiveChannel) }
+  }
   /// Color index used in the arrange/mixer view.
-  public var seqColorIndex: Int
+  public var seqColorIndex: Int {
+    didSet { setPlist("Channel_seqColorIndex", value: seqColorIndex) }
+  }
   /// Icon index for the track header in the arrange window.
-  public var trackIcon: Int
+  public var trackIcon: Int {
+    didSet { setPlist("Track_icon", value: trackIcon) }
+  }
   /// Whether the user has manually edited the Smart Controls mapping.
-  public var userDidModifySmartControls: Bool
+  public var userDidModifySmartControls: Bool {
+    didSet { setPlist("Channel_userDidModifySmartControls", value: userDidModifySmartControls) }
+  }
   /// Channel strip category. Present on root strips; absent on additional strips in summing stacks.
-  public var chaStrCategory: String?
+  public var chaStrCategory: String? {
+    didSet { setPlist("Channel_chaStrCategory", value: chaStrCategory) }
+  }
   /// Send slot configurations. The populated structure is unknown; all available
   /// examples contain empty send slots.
-  public var sends: [PatchSend]
+  public var sends: [PatchSend] {
+    didSet { setPlist("Channel_sends", value: sends.map { _ in [String: Any]() }) }
+  }
+
+  // Full parsed plist dictionary for round-trip fidelity; unknown keys survive mutation.
+  private var plist: PlistDict
 
   /// The selected hardware audio input, if any.
   ///
@@ -135,6 +186,28 @@ public struct PatchChannelSettings: Codable, Sendable {
   public var audioInput: AudioInput? {
     guard !inputIsBus, let isStereo = inputIsStereo else { return nil }
     return AudioInput(inputIndex: inputIndex, isStereo: isStereo)
+  }
+
+  private mutating func setPlist(_ key: String, value: Any?) {
+    var dict = plist.storage
+    if let value = value {
+      dict[key] = value
+    } else {
+      dict.removeValue(forKey: key)
+    }
+    plist = PlistDict(dict)
+  }
+
+  private mutating func removePlist(_ key: String) {
+    var dict = plist.storage
+    dict.removeValue(forKey: key)
+    plist = PlistDict(dict)
+  }
+
+  /// Inject the original plist dictionary after Codable decoding so that
+  /// unknown keys are preserved during round-trip serialization.
+  fileprivate mutating func injectPlist(_ dict: [String: Any]) {
+    plist = PlistDict(dict)
   }
 
   enum CodingKeys: String, CodingKey {
@@ -186,6 +259,7 @@ public struct PatchChannelSettings: Codable, Sendable {
     userDidModifySmartControls = try c.decode(Bool.self, forKey: .userDidModifySmartControls)
     chaStrCategory = try c.decodeIfPresent(String.self, forKey: .chaStrCategory)
     sends = try c.decode([PatchSend].self, forKey: .sends)
+    plist = PlistDict([:])
   }
 }
 
@@ -198,29 +272,9 @@ public struct PatchSend: Codable, Sendable {}
 extension PatchChannelSettings {
   /// Re-encode to the plist dictionary representation used in `data.plist`.
   ///
-  /// Mirrors the CodingKeys mapping so that mutations to typed properties are
-  /// correctly reflected when `PatchData.data()` re-serializes the plist.
+  /// Patches typed property values into the original plist dictionary so that
+  /// unknown keys survive round-trip serialization.
   fileprivate func toPlistDict() -> [String: Any] {
-    var dict: [String: Any] = [:]
-    dict["Filename"] = filename
-    dict["UUID"] = uuid.uuidString
-    dict["Channel_name"] = name
-    if isRoot { dict["Root"] = true }
-    dict["Channel_isMuted"] = isMuted
-    dict["Channel_isSolo"] = isSolo
-    dict["Channel_instID"] = instrID
-    dict["Channel_inputIndex_1"] = inputIndex
-    dict["Channel_inputIsBus"] = inputIsBus
-    if let v = inputIsStereo { dict["Channel_inputIsStereo"] = v }
-    dict["Channel_outputIndex"] = outputIndex
-    dict["Channel_outputIsBus"] = outputIsBus
-    if let v = outputIsStereo { dict["Channel_outputIsStereo"] = v }
-    dict["Channel_receiveChannel"] = receiveChannel
-    dict["Channel_seqColorIndex"] = seqColorIndex
-    dict["Track_icon"] = trackIcon
-    dict["Channel_userDidModifySmartControls"] = userDidModifySmartControls
-    if let v = chaStrCategory { dict["Channel_chaStrCategory"] = v }
-    dict["Channel_sends"] = sends.map { _ in [String: Any]() }
-    return dict
+    return plist.storage
   }
 }

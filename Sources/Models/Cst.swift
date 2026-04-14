@@ -103,8 +103,10 @@ private enum CstBlock: Sendable {
 public struct CstPlugin: Codable, Sendable {
   /// The plugin data (PST binary or AU Preset plist).
   public var setting: PluginSetting
-  /// The filename Logic Pro displays for this slot (e.g. `"Access Codes.pst"`),
-  /// or `nil` if the block has no filename field.
+  /// The preset filename stored in the UCuA block prefix
+  /// (e.g. `"Access Codes.pst"`, `"SomeEffect.aupreset"`), or `nil` if the
+  /// block has no filename field. This is the raw value from the file —
+  /// callers must include the file extension.
   public var presetName: String?
 
   public init(setting: PluginSetting, presetName: String? = nil) {
@@ -388,6 +390,7 @@ public struct Cst: Codable, Sendable, LogicFileData {
   }
 
   /// Write a preset filename into a block prefix (e.g. `"Access Codes.pst"`).
+  /// The caller must include the file extension.
   private static func writePresetFilename(into prefix: inout Data, filename: String) {
     guard prefix.count >= minPrefixForFilename else { return }
     var field = Data(count: filenameRange.count)  // zero-filled

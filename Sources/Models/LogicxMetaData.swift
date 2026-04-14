@@ -104,7 +104,7 @@ extension LogicxMetaData {
   /// Reads or writes a value in the underlying plist dictionary by key.
   /// Setting a value discards the stored original bytes so that `data()` re-serializes
   /// from the modified dictionary rather than returning the unmodified file.
-  subscript(key: String) -> Any? {
+  public subscript(key: String) -> Any? {
     get { plist.storage[key] }
     set {
       var dict = plist.storage
