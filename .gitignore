@@ -11,3 +11,4 @@ DerivedData/
 /Fuzz/Corpus/
 /Fuzz/*.log
 crash-*
+slow-unit-*
