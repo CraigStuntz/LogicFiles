@@ -16,6 +16,16 @@ Logic Pro can save projects in two formats, selectable in the Save dialog:
 Both formats support the same content; the difference is structural only. Audio files
 may be embedded in the project or referenced externally in both formats.
 
+## Round-Trip Fidelity
+
+`init(contentsOf:)` followed by `write(to:)` preserves the following byte-for-byte:
+
+- **`ProjectData`** — stored as opaque `Data`; never re-serialized.
+- **`DisplayStateArchive`** — stored as opaque `Data`; parsed for typed access only.
+- **`ProjectInformation.plist`**, **`MetaData.plist`**, **`DisplayState.plist`** — stored as raw plist dictionaries; re-serialized via `PropertyListSerialization` when `write(to:)` is called. Unknown keys survive round-trips; byte-for-byte identity is not guaranteed after mutation because plist key order may differ.
+
+Mutating any typed property (e.g. `metaData.tempo`) and calling `write(to:)` produces a valid, loadable project but will not be byte-for-byte identical to the original file.
+
 ## Bundle Structure (Package format)
 
 A `.logicx` bundle is a directory with the following hierarchy:

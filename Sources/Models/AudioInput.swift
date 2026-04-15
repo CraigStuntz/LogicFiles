@@ -5,7 +5,9 @@ import Foundation
 /// Logic Pro's internal encoding reserves values 1–8 for mono inputs and values 9+ for
 /// stereo pairs. The conversion formula is inferred from two confirmed data points:
 /// raw `0x01` (mono Input 1) and `0x09` (stereo In 1-2). Other values follow the same
-/// pattern but have not been verified against real Logic Pro files.
+/// pattern but have not been verified against real Logic Pro files. If you observe a
+/// raw value that produces an unexpected result, please open an issue with the raw byte
+/// and the Logic Pro version used to create the file.
 ///
 /// - Note: As of this writing, non-nil values have only been observed in CST files
 ///   embedded inside a `.patch` bundle. Standalone `.cst` files always return `nil`

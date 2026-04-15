@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-04-15
+
 ### Added
 
 * `Logicx` — new bundle type for Logic Pro project files (`.logicx`); conforms to `LogicFileBundle`, `Codable`, `Sendable`. Loads and writes the full bundle structure including project information, alternatives, and media directories. Format insights informed by [logicx-analyzer](https://github.com/geoffmyers/logicx-analyzer/) by Geoff Myers.
@@ -41,6 +43,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+* `PatchChannelSettings` — round-trip data loss: the `toPlistDict()` encoding path was not propagating all typed fields back to the plist dictionary, so a load → write cycle would silently drop some channel strip settings.
 * `PatchData`, `LogicxMetaData`, `LogicxDisplayState`, `LogicxProjectInformation` — eliminated a redundant `PropertyListDecoder` pass that could crash on certain malformed binary plists accepted by `PropertyListSerialization`. Typed fields are now extracted directly from the already-parsed dictionary. Found via libFuzzer coverage-guided fuzz testing.
 
 ### Performance
@@ -68,5 +71,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - All public types conform to `Codable` and `Sendable`.
 * Requires Swift 6.2+ and targets macOS 13+ / iOS 16+.
 
-[Unreleased]: https://github.com/CraigStuntz/LogicFiles/compare/0.1.0...HEAD
+[Unreleased]: https://github.com/CraigStuntz/LogicFiles/compare/0.2.0...HEAD
+[0.2.0]: https://github.com/CraigStuntz/LogicFiles/compare/0.1.0...0.2.0
 [0.1.0]: https://github.com/CraigStuntz/LogicFiles/releases/tag/0.1.0
