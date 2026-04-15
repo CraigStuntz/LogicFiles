@@ -7,21 +7,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Fixed
-
-* `PatchData`, `LogicxMetaData`, `LogicxDisplayState`, `LogicxProjectInformation` — eliminated a redundant `PropertyListDecoder` pass that could crash on certain malformed binary plists accepted by `PropertyListSerialization`. Typed fields are now extracted directly from the already-parsed dictionary. Found via libFuzzer coverage-guided fuzz testing.
-
 ### Added
 
+* `Logicx` — new bundle type for Logic Pro project files (`.logicx`); conforms to `LogicFileBundle`, `Codable`, `Sendable`. Loads and writes the full bundle structure including project information, alternatives, and media directories. Format insights informed by [logicx-analyzer](https://github.com/geoffmyers/logicx-analyzer/) by Geoff Myers.
+* `LogicxAlternative` — represents a single alternative within a `.logicx` bundle, composing `LogicxMetaData`, `LogicxDisplayState`, `KeyedArchive` (display state archive), opaque `ProjectData`, and optional `WindowImage.jpg`.
+* `LogicxProjectInformation` — typed wrapper for `Resources/ProjectInformation.plist` with `bundleVersion`, `lastSavedFrom`, and `variantNames` fields; preserves unknown keys for round-trip fidelity.
+* `LogicxMetaData` — typed wrapper for per-alternative `MetaData.plist` with tempo, sample rate, key, time signature, and track count fields.
+* `LogicxDisplayState` — typed wrapper for per-alternative `DisplayState.plist` with `displayDataVersion` and `screensetCurrSlot` fields.
+* `LogicxStorageFormat` — new enum with cases `.bundle` (macOS directory bundle, the default) and `.folder` (plain project folder with `.logicx` sub-bundle).
+* `Logicx.audioFilesURL: URL?` — URL of the `Audio Files` directory on disk after loading; `nil` when constructed programmatically or when audio files are referenced externally.
+* `LogicxProjectInformation.hasProjectFolder: Bool` — decoded from the `HasProjectFolder` plist key; `false` for bundle format projects, `true` for folder format.
+* `LogicFileBundle` — new protocol for Logic Pro file types stored as directory bundles on disk; mirrors `LogicFileData` but uses `init(contentsOf:) throws` / `write(to:) throws` instead of `Data`-based init/serialization. `Patch` and `Logicx` now conform.
+* `SessionPlayerTrackState` — character name, internal type ID, and Producer Kit flag for one Session Player track; extracted from the `genInstDrummerBaseModel.state` JSON embedded in `ProjectData`.
+* `SessionPlayerParameters` — musical parameters (intensity, dynamics, humanize, swing, rhythm complexity, melodic complexity, fill density, variation) shared across Session Player preset types.
+* `SessionPlayerPreset` — preset name, character, unique identifier, region type, and parameters for one generated Session Player region; extracted from the region-level JSON embedded in `ProjectData`.
+* `LogicxAlternative.sessionPlayerTrackStates() -> [SessionPlayerTrackState]` — returns all Session Player track states found in `ProjectData`; returns an empty array for alternatives with no generated regions.
+* `LogicxAlternative.sessionPlayerPresets() -> [SessionPlayerPreset]` — returns one entry per generated Session Player region found in `ProjectData`; returns an empty array for alternatives with no generated regions.
+* `AudioInput` — new struct representing a selected hardware audio input (mono or stereo), with `inputIndex` and `isStereo` properties.
+* `Cst.audioInput: AudioInput?` — reads the audio input selector byte from the OCuA header marker `00 80 00 80`; returns `nil` for instrument/bus strips and all standalone `.cst` files examined.
+* `PatchChannelSettings.inputIsStereo: Bool?` — decodes the `Channel_inputIsStereo` key from the patch `data.plist`; `nil` for non-audio channel strips.
+* `PatchChannelSettings.audioInput: AudioInput?` — synthesizes an `AudioInput` from `inputIndex` and `inputIsStereo`; returns `nil` for bus inputs and instrument/MIDI channel strips.
 * Fuzz testing infrastructure — 8 libFuzzer-based fuzz targets (one per `Data`-based `init`) under `Tools/Fuzz*/`, with a `run-fuzzers.sh` driver script. Seeded from existing test fixtures for coverage-guided mutation. Driver accepts an optional target list (e.g. `./Tools/run-fuzzers.sh 30 FuzzCst`) and a `-j N` / `--workers N` flag to run N parallel fuzzer processes per target; defaults to `ceil(logical_cpus / num_targets)` so a single-target run saturates all cores automatically.
 * `BenchmarkCst` — release-mode executable (`Tools/BenchmarkCst/`) that loops over the CST corpus calling `Cst.init(data:)` for 10 seconds and reports iterations per second. Use with `sample` or Instruments to profile `Cst.init` without AddressSanitizer overhead. See `README.md § Performance benchmarking`.
-
-### Performance
-
-* `KeyedArchive.resolveVal` — moved the `cfUID` check (which uses string interpolation via `"\(val)"`) to after the `[String: Any]` and `[Any]` type checks. Previously, calling `"\(val)"` on an `NSDictionary` triggered `descriptionWithLocale:indent:`, which recursively formatted the entire object graph as a string on every node visit. This produced a 2× throughput improvement and a 28× reduction in heap footprint for CST files containing `KeyedArchive` blocks (342 MB → 12 MB peak RSS in the release benchmark).
-* `Cst` — magic byte sequences (`OCuA`, `UCuA`, `GAMETSPP`, `PPSTEMAG`, `<?xml`, `bplist00`, `</plist>`) are now `private static let` constants instead of being heap-allocated on every call to the parser functions that use them.
-* `Cst.readUInt32LE` — reads 4 bytes directly via `withUnsafeBytes { $0.loadUnaligned(fromByteOffset:as:) }` instead of allocating a `subdata` slice.
-* `Cst.isPstHeader` — compares the 8-byte magic field as a `UInt64` loaded via `withUnsafeBytes`, eliminating the `subdata` allocation for the comparison.
 
 ### Changed
 
@@ -32,26 +39,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 * `Logicx.init(contentsOf:)` — now auto-detects both the package format (`.logicx` bundle) and the folder format (plain directory with `.musicapps-project-folder` marker). Pass either URL and the correct format is loaded.
 * `Logicx.write(to:)` — renamed to `write(to:as:)` with a new `LogicxStorageFormat` parameter (`.bundle` or `.folder`, default `.bundle`). The no-argument `write(to:)` still exists to satisfy `LogicFileBundle` and writes as a bundle.
 
-### Added
+### Fixed
 
-* `SessionPlayerTrackState` — character name, internal type ID, and Producer Kit flag for one Session Player track; extracted from the `genInstDrummerBaseModel.state` JSON embedded in `ProjectData`.
-* `SessionPlayerParameters` — musical parameters (intensity, dynamics, humanize, swing, rhythm complexity, melodic complexity, fill density, variation) shared across Session Player preset types.
-* `SessionPlayerPreset` — preset name, character, unique identifier, region type, and parameters for one generated Session Player region; extracted from the region-level JSON embedded in `ProjectData`.
-* `LogicxAlternative.sessionPlayerTrackStates() -> [SessionPlayerTrackState]` — returns all Session Player track states found in `ProjectData`; returns an empty array for alternatives with no generated regions.
-* `LogicxAlternative.sessionPlayerPresets() -> [SessionPlayerPreset]` — returns one entry per generated Session Player region found in `ProjectData`; returns an empty array for alternatives with no generated regions.
-* `LogicxStorageFormat` — new enum with cases `.bundle` (macOS directory bundle, the default) and `.folder` (plain project folder with `.logicx` sub-bundle).
-* `Logicx.audioFilesURL: URL?` — URL of the `Audio Files` directory on disk after loading; `nil` when constructed programmatically or when audio files are referenced externally.
-* `LogicxProjectInformation.hasProjectFolder: Bool` — decoded from the `HasProjectFolder` plist key; `false` for bundle format projects, `true` for folder format.
-* `Logicx` — new bundle type for Logic Pro project files (`.logicx`); conforms to `LogicFileBundle`, `Codable`, `Sendable`. Loads and writes the full bundle structure including project information, alternatives, and media directories. Format insights informed by [logicx-analyzer](https://github.com/geoffmyers/logicx-analyzer/) by Geoff Myers.
-* `LogicxAlternative` — represents a single alternative within a `.logicx` bundle, composing `LogicxMetaData`, `LogicxDisplayState`, `KeyedArchive` (display state archive), opaque `ProjectData`, and optional `WindowImage.jpg`.
-* `LogicxProjectInformation` — typed wrapper for `Resources/ProjectInformation.plist` with `bundleVersion`, `lastSavedFrom`, and `variantNames` fields; preserves unknown keys for round-trip fidelity.
-* `LogicxMetaData` — typed wrapper for per-alternative `MetaData.plist` with tempo, sample rate, key, time signature, and track count fields.
-* `LogicxDisplayState` — typed wrapper for per-alternative `DisplayState.plist` with `displayDataVersion` and `screensetCurrSlot` fields.
-* `LogicFileBundle` — new protocol for Logic Pro file types stored as directory bundles on disk; mirrors `LogicFileData` but uses `init(contentsOf:) throws` / `write(to:) throws` instead of `Data`-based init/serialization. `Patch` and `Logicx` now conform.
-* `AudioInput` — new struct representing a selected hardware audio input (mono or stereo), with `inputIndex` and `isStereo` properties.
-* `Cst.audioInput: AudioInput?` — reads the audio input selector byte from the OCuA header marker `00 80 00 80`; returns `nil` for instrument/bus strips and all standalone `.cst` files examined.
-* `PatchChannelSettings.inputIsStereo: Bool?` — decodes the `Channel_inputIsStereo` key from the patch `data.plist`; `nil` for non-audio channel strips.
-* `PatchChannelSettings.audioInput: AudioInput?` — synthesizes an `AudioInput` from `inputIndex` and `inputIsStereo`; returns `nil` for bus inputs and instrument/MIDI channel strips.
+* `PatchData`, `LogicxMetaData`, `LogicxDisplayState`, `LogicxProjectInformation` — eliminated a redundant `PropertyListDecoder` pass that could crash on certain malformed binary plists accepted by `PropertyListSerialization`. Typed fields are now extracted directly from the already-parsed dictionary. Found via libFuzzer coverage-guided fuzz testing.
+
+### Performance
+
+* `KeyedArchive.resolveVal` — moved the `cfUID` check (which uses string interpolation via `"\(val)"`) to after the `[String: Any]` and `[Any]` type checks. Previously, calling `"\(val)"` on an `NSDictionary` triggered `descriptionWithLocale:indent:`, which recursively formatted the entire object graph as a string on every node visit. This produced a 2× throughput improvement and a 28× reduction in heap footprint for CST files containing `KeyedArchive` blocks (342 MB → 12 MB peak RSS in the release benchmark).
+* `KeyedArchive` — UID lookups are now memoized per-resolution using an internal cache, eliminating repeated traversal of shared entries (especially `$class` nodes). This produced a 16× throughput improvement in the release benchmark (271 → 4,461 iter/s) and an ~19× improvement in the fuzz build (181 → 3,404 exec/s/worker).
+* `Cst` — magic byte sequences (`OCuA`, `UCuA`, `GAMETSPP`, `PPSTEMAG`, `<?xml`, `bplist00`, `</plist>`) are now `private static let` constants instead of being heap-allocated on every call to the parser functions that use them.
+* `Cst.readUInt32LE` — reads 4 bytes directly via `withUnsafeBytes { $0.loadUnaligned(fromByteOffset:as:) }` instead of allocating a `subdata` slice.
+* `Cst.isPstHeader` — compares the 8-byte magic field as a `UInt64` loaded via `withUnsafeBytes`, eliminating the `subdata` allocation for the comparison.
 
 ## [0.1.0] - 2026-04-11
 
