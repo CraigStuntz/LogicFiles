@@ -198,7 +198,8 @@ public struct KeyedArchive: Codable, Sendable {
   private static func resolveTop(_ plist: [String: Any]) -> [String: Any] {
     let objects = plist["$objects"] as? [Any] ?? []
     let top = plist["$top"] as? [String: Any] ?? [:]
-    return top.mapValues { resolveVal($0, objects: objects, depth: 0) }
+    let cache = UIDCache(capacity: objects.count)
+    return top.mapValues { resolveVal($0, objects: objects, cache: cache, depth: 0) }
   }
 
   /// Extracts the integer value from a CFKeyedArchiverUID (__NSCFType).
@@ -216,23 +217,34 @@ public struct KeyedArchive: Codable, Sendable {
     return Int(desc[valueStart.upperBound..<valueEnd])
   }
 
-  private static func resolveVal(_ val: Any, objects: [Any], depth: Int) -> Any {
+  /// Resolve a UID index into the objects array, returning a cached result if available.
+  private static func resolveUID(
+    _ uid: Int, objects: [Any], cache: UIDCache, depth: Int
+  ) -> Any {
+    if let cached = cache.resolved[uid] { return cached }
+    guard uid > 0, uid < objects.count else { return NSNull() }
+    let result = resolveVal(objects[uid], objects: objects, cache: cache, depth: depth + 1)
+    cache.resolved[uid] = result
+    return result
+  }
+
+  private static func resolveVal(_ val: Any, objects: [Any], cache: UIDCache, depth: Int) -> Any {
     guard depth < 32 else { return NSNull() }
 
     if let dict = val as? [String: Any] {
       // XML plist UID: {CF$UID: N}
       if let uid = dict["CF$UID"] as? Int {
-        guard uid > 0, uid < objects.count else { return NSNull() }
-        return resolveVal(objects[uid], objects: objects, depth: depth + 1)
+        return resolveUID(uid, objects: objects, cache: cache, depth: depth)
       }
 
       // Resolve all sub-values; handle $class and NS collection patterns
       var resolved: [String: Any] = [:]
       for (k, v) in dict where k != "$class" {
-        resolved[k] = resolveVal(v, objects: objects, depth: depth + 1)
+        resolved[k] = resolveVal(v, objects: objects, cache: cache, depth: depth + 1)
       }
       if let classRef = dict["$class"],
-        let classDict = resolveVal(classRef, objects: objects, depth: depth + 1) as? [String: Any],
+        let classDict = resolveVal(classRef, objects: objects, cache: cache, depth: depth + 1)
+          as? [String: Any],
         let className = classDict["$classname"] as? String
       {
         // NSDictionary / NSMutableDictionary
@@ -268,7 +280,7 @@ public struct KeyedArchive: Codable, Sendable {
     }
 
     if let arr = val as? [Any] {
-      return arr.map { resolveVal($0, objects: objects, depth: depth + 1) }
+      return arr.map { resolveVal($0, objects: objects, cache: cache, depth: depth + 1) }
     }
 
     // Binary plist UID: __NSCFType (CFKeyedArchiverUID).
@@ -277,12 +289,24 @@ public struct KeyedArchive: Codable, Sendable {
     // At this point val is neither a dict nor an array, so it is either a primitive
     // (String, Number, Data, NSNull) or a UID — both cheap to format.
     if let uid = cfUID(from: val) {
-      guard uid > 0, uid < objects.count else { return NSNull() }
-      return resolveVal(objects[uid], objects: objects, depth: depth + 1)
+      return resolveUID(uid, objects: objects, cache: cache, depth: depth)
     }
 
     // Primitive (String, Int, Double, Bool, Data, NSNull)
     return val
+  }
+}
+
+/// Per-resolution memoization cache for UID lookups.
+///
+/// NSKeyedArchiver archives share UIDs heavily — most objects reference the same
+/// small set of class-description UIDs (e.g. every NSDictionary points to the same
+/// NSMutableDictionary class entry). A final class is used rather than inout so the
+/// cache can be captured by the closures inside map(_:).
+private final class UIDCache {
+  var resolved: [Int: Any]
+  init(capacity: Int) {
+    resolved = [Int: Any](minimumCapacity: capacity)
   }
 }
 
