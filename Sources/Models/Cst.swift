@@ -608,6 +608,10 @@ public struct Cst: Codable, Sendable, LogicFileData {
 
   // MARK: - Plugin data detection (unchanged from original)
 
+  /// Returns candidate byte offsets where a plugin payload might start within a UCuA block.
+  ///
+  /// Scans for GAMETSPP/PPSTEMAG magic (PST), `<?xml` (XML AU Preset), and `bplist00`
+  /// (binary plist / NSKeyedArchiver). Offsets are deduplicated and sorted by the caller.
   private static func pluginStartOffsets(in data: Data) throws -> [Int] {
     var offsets = Set<Int>()
 
@@ -636,6 +640,10 @@ public struct Cst: Codable, Sendable, LogicFileData {
     return offsets.sorted()
   }
 
+  /// Attempts to parse a plugin setting from `data` beginning at `start`.
+  ///
+  /// Tries each candidate end boundary in order, returning the first successful parse
+  /// along with the exact byte index after the plugin data, or `nil` if no candidate works.
   private static func extractPluginSetting(from data: Data, start: Int, candidateEnds: [Int]) throws
     -> (PluginSetting, Int)?
   {
@@ -683,6 +691,7 @@ public struct Cst: Codable, Sendable, LogicFileData {
     return nil
   }
 
+  /// Returns true if the 8 bytes at `start + 12` match the GAMETSPP or PPSTEMAG magic.
   private static func isPstHeader(start: Int, in data: Data) -> Bool {
     guard start + 20 <= data.count else { return false }
     return data.withUnsafeBytes { ptr in
@@ -692,6 +701,7 @@ public struct Cst: Codable, Sendable, LogicFileData {
     }
   }
 
+  /// Returns the byte index immediately after the `</plist>` closing tag, or nil if not found.
   private static func xmlPlistEnd(in data: Data) -> Int? {
     guard let closeRange = data.range(of: plistEndMagic) else {
       return nil
@@ -699,6 +709,9 @@ public struct Cst: Codable, Sendable, LogicFileData {
     return closeRange.upperBound
   }
 
+  /// Searches the few bytes before `start` for a LE uint32 length field that, when
+  /// added to `start`, lands exactly on the closing `</plist>` tag. Returns the length,
+  /// or nil if no such field is found. Used to locate the end of an XML AU Preset block.
   private static func xmlLengthHeader(in data: Data, start: Int) -> Int? {
     let offsets = [4, 8, 12, 16, 20, 24]
     for offset in offsets {
@@ -716,6 +729,8 @@ public struct Cst: Codable, Sendable, LogicFileData {
     return nil
   }
 
+  /// Parses an XML AU Preset starting at `start` using the length field found before it.
+  /// Returns the parsed `Aupreset` and the byte index immediately after it, or nil on failure.
   private static func parseXmlAupreset(from data: Data, start: Int, maxEnd: Int) throws -> (
     Aupreset, Int
   )? {
@@ -727,6 +742,8 @@ public struct Cst: Codable, Sendable, LogicFileData {
     return nil
   }
 
+  /// Reads the LE uint32 at `start - 4` and returns it as the binary AU Preset length,
+  /// or nil if out of bounds or the resulting end would exceed the data buffer.
   private static func binaryAupresetLengthHeader(in data: Data, start: Int) -> Int? {
     let lengthIndex = start - 4
     guard lengthIndex >= 0 else { return nil }
@@ -738,6 +755,9 @@ public struct Cst: Codable, Sendable, LogicFileData {
     return length
   }
 
+  /// Parses a binary plist AU Preset starting at `start` using the length field found before it.
+  /// Rejects NSKeyedArchiver plists (those are handled as `.keyedArchive` blocks, not `Aupreset`).
+  /// Returns the parsed `Aupreset` and the byte index immediately after it, or nil on failure.
   private static func parseBinaryAupreset(from data: Data, start: Int, maxEnd: Int) throws -> (
     Aupreset, Int
   )? {

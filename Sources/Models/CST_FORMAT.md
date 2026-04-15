@@ -135,8 +135,8 @@ For from-scratch CSTs where the prefix is shorter than 188 bytes, the parser fal
 - Slot 2: instrument (Instrument channel strips); first audio FX (Track channel strips)
 - Slots 3–6: audio FX in signal-flow order (Instrument channel strips only; Track uses 2–5)
 - Slots 7–10: MIDI FX in signal-flow order
-- Slots 9–11: may also hold NSKeyedArchiver system blocks
-- Slot 12+: opaque/system blocks (`.opaque` or `.keyedArchive` in parser)
+- Slots 9–11: may also hold NSKeyedArchiver system blocks (parsed as `.plugin(_, .keyedArchive, _)` blocks)
+- Slot 12+: always parsed as opaque `CstBlock.opaque` blocks — never as `.plugin` blocks
 
 ## Future Work
 

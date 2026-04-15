@@ -129,7 +129,6 @@ struct PstHeader: Codable {
 enum PstParseError: Error {
     case insufficientData(String)   // File shorter than 24 bytes
     case invalidMagic(String)       // Magic string not "GAMETSPP"
-    case invalidFormat(String)      // Malformed structure
 }
 ```
 

@@ -8,6 +8,7 @@ struct PlistDict: @unchecked Sendable {
   init(_ storage: [String: Any]) { self.storage = storage }
 }
 
+/// Parses a property list from raw bytes, returning the root object and the detected format.
 func parsePlist(from data: Data) throws -> (Any, PropertyListSerialization.PropertyListFormat) {
   var format = PropertyListSerialization.PropertyListFormat.xml
   let plist = try PropertyListSerialization.propertyList(from: data, options: [], format: &format)

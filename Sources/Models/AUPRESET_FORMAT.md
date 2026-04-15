@@ -41,6 +41,7 @@ AU Preset files are XML or binary plist files containing:
 - **Encoding**: UTF-8 for XML, binary for compressed storage
 
 ### 2. Core Metadata Fields
+- **`name`**: Preset display name (e.g., "Heavy Compression")
 - **`data`**: Base64-encoded binary preset parameters
 - **`manufacturer`**: 4-byte manufacturer code (e.g., Apple = 'appl')
 - **`subtype`**: 4-byte AU subtype identifier
