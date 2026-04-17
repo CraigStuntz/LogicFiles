@@ -32,6 +32,52 @@ swift run logicfiles info <file>   # Run the CLI tool
 
 ## Usage
 
+### Adding LogicFiles as a dependency
+
+First, add the reference to `Package.swift` by:
+
+```bash
+$ swift package add-dependency https://github.com/CraigStuntz/LogicFiles --from 0.2.0
+```
+
+...which will add the code:
+
+```swift
+let package = Package(
+  // other keys
+  dependencies: [
+    // other dependencies
+    .package(url: "https://github.com/CraigStuntz/LogicFiles", from: "0.2.0"),
+  ],
+```
+
+...to `Package.swift`.
+
+Then add a dependency _to your sepcific target_ (this is a different `dependencies` 
+key than above!) in `Package.swift`:
+
+```swift
+let package = Package(
+  // other keys
+  dependencies: [
+    // other dependencies
+    .package(url: "https://github.com/CraigStuntz/LogicFiles", from: "0.2.0"),
+  ],
+  targets: [
+    .executableTarget(
+      name: "MyProject",
+      dependencies: [
+        // other dependencies
+        .product(name: "LogicFiles", package: "LogicFiles")
+      ],
+```
+
+Finally, add an `import` to the specific `.swift` file you want to use `LogicFiles` in:
+
+```swift
+import LogicFiles
+```
+
 ### Protocols
 
 All file types conform to `LogicFile`, which defines `pathExtension` and extension matching:
