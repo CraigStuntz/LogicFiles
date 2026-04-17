@@ -53,7 +53,7 @@ let package = Package(
 
 ...to `Package.swift`.
 
-Then add a dependency _to your sepcific target_ (this is a different `dependencies` 
+Then add a dependency _to your specific target_ (this is a different `dependencies` 
 key than above!) in `Package.swift`:
 
 ```swift
